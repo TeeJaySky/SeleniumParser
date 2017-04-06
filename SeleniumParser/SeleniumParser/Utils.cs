@@ -42,7 +42,7 @@ namespace SeleniumParser
             {
                 foreach (var value in result.BestSellerCategoryToRank)
                 {
-                    writer.WriteLine(value.Key + ", " + value.Value + ": " + result.Url);
+                    writer.WriteLine(value.Key + ", " + value.Value + ", " + result.Url);
                 }
             }
         }
@@ -64,6 +64,31 @@ namespace SeleniumParser
             driver.FindElement(By.Id("pagnNextString")).Click();
 
             Utils.WaitForPageToLoad();
+        }
+
+        public static string ProcessCategoryName(IWebElement rank, string categoryName)
+        {
+            if (categoryName == "T-Shirts")
+            {
+                // Determine whether or not it is for men or women
+                var ladder = rank.FindElement(By.ClassName("zg_hrsr_ladder"));
+                var ladderCategories = ladder.FindElements(By.CssSelector("a"));
+
+                foreach (var ladderValue in ladderCategories)
+                {
+                    if (ladderValue.Text == "Women")
+                    {
+                        categoryName = "Women's " + categoryName;
+                        break;
+                    }
+                    else if (ladderValue.Text == "Men")
+                    {
+                        categoryName = "Men's " + categoryName;
+                        break;
+                    }
+                }
+            }
+            return categoryName;
         }
     }
 }

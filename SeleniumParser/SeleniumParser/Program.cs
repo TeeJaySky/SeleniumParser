@@ -138,6 +138,8 @@ namespace SeleniumParser
                 // Only consdier if the rank is in one of the specified categories
                 if (CategoriesToConsider.Contains(categoryName))
                 {
+                    categoryName = Utils.ProcessCategoryName(rank, categoryName);
+
                     // Trim off the hash from the rank
                     var rankingString = rank.FindElement(By.ClassName("zg_hrsr_rank")).Text.Substring(1);
                     var rankingInt = Convert.ToInt32(rankingString);

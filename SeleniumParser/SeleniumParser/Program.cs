@@ -18,16 +18,17 @@ namespace SeleniumParser
 
         static string SearchCategory = "Clothing, Shoes & Jewelry";
 
-        static List<string> SearchTerms = new List<string> { "cat t shirt" }; //"cat saying t shirt", "dog saying t shirt", "funny saying t shirt"};
+        static List<string> SearchTerms = new List<string> { "cat t shirt", "cat saying t shirt", "dog saying t shirt", "funny saying t shirt", "motivational t shirt"};
         static List<string> CategoriesToConsider = new List<string> { "T-Shirts", "Tank Tops", "T-Shirts & Tanks", "Tanks & Camis" };
         
         static void Main(string[] args)
         {
-            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser");
+            ChromeOptions options = new ChromeOptions();
+            // When launching chrome, configure it not to load images as this will slow down the page load times
+            options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
+            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options);
             driver.Url = "http://www.amazon.com";
             Utils.WaitForPageToLoad();
-
-            List<string> productPagesToReview = new List<string>();
 
             foreach (var term in SearchTerms)
             {
@@ -37,16 +38,15 @@ namespace SeleniumParser
                 Utils.WaitForPageToLoad();
 
                 int numberOfPagesSearched = 0;
+                int numberOfProductsFound = 0;
                 // Keep looking until we have found the requested number of products OR we have searched too many pages
-                while (productPagesToReview.Count < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
+                while (numberOfProductsFound < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
                 {
-                    FindProductsWorthConsideringOnCurrentPage(driver, term);
+                    numberOfProductsFound += FindProductsWorthConsideringOnCurrentPage(driver, term);
 
                     Utils.MoveToNextPage(driver);
                     numberOfPagesSearched++;
                 }
-
-                //Utils.WriteLinksToFileForSearchTerm(term, productPagesToReview);
             }
 
             Console.ReadKey();
@@ -77,8 +77,9 @@ namespace SeleniumParser
             searchButton.Click();
         }
 
-        private static void FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term)
+        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term)
         {
+            int numberFound = 0;
             // Take a copy of the current page, so that we can return to this after evaluating each product
             var productPageLink = driver.Url;
 
@@ -88,12 +89,27 @@ namespace SeleniumParser
                 Utils.WriteBlankLines(2);
                 Utils.GoToLink(driver, productLink);
 
-                var consideration = GetDesignConsideration(driver);
-                Utils.WriteToFile(term, consideration);
+                try
+                {
+                    var consideration = GetDesignConsideration(driver);
+
+                    if(consideration.BestSellerCategoryToRank.Count > 0)
+                    {
+                        numberFound++;
+                        Utils.WriteToFile(term, consideration);
+                    }
+                }
+                catch(Exception e)
+                {
+                    // Catch and keep on powering on!
+                    Utils.WriteToFile("Error", "Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
+                }
             }
 
             // Go back to the product page after looking at all of the products
             Utils.GoToLink(driver, productPageLink);
+
+            return numberFound;
         }
 
         public static List<string> GetProductLinksOnPage(IWebDriver driver)

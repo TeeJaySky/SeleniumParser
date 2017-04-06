@@ -11,7 +11,7 @@ namespace SeleniumParser
 {
     public class Utils
     {
-        static int PageLoadDuration = 1000;
+        static int PageLoadDuration = 0;
         static string OutputFileDir = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\";
 
         public static void WriteBlankLines(int number = 1)
@@ -34,6 +34,14 @@ namespace SeleniumParser
         {
             // Wait for page to load
             Thread.Sleep(PageLoadDuration);
+        }
+
+        public static void WriteToFile(string filename, string value)
+        {
+            using (var writer = File.AppendText(OutputFileDir + filename + ".txt"))
+            {
+                writer.WriteLine(value);
+            }
         }
 
         public static void WriteToFile(string term, SuccessDescriptor result)

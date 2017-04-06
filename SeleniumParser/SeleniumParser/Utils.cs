@@ -14,6 +14,23 @@ namespace SeleniumParser
         static int PageLoadDuration = 0;
         static string OutputFileDir = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\";
 
+        /// <summary>
+        /// Create the driver and navigate to amazon home
+        /// </summary>
+        /// <returns></returns>
+        public static IWebDriver CreateDriver()
+        {
+            ChromeOptions options = new ChromeOptions();
+            // When launching chrome, configure it not to load images as this will slow down the page load times
+            options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
+            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options);
+
+            driver.Url = "http://www.amazon.com";
+            Utils.WaitForPageToLoad();
+
+            return driver;
+        }
+
         public static void WriteBlankLines(int number = 1)
         {
             for (int i = 0; i < number; i ++)
@@ -34,6 +51,11 @@ namespace SeleniumParser
         {
             // Wait for page to load
             Thread.Sleep(PageLoadDuration);
+        }
+
+        public static void WriteError(string message)
+        {
+            WriteToFile("Log", DateTime.Now.ToString() + ", Error, " + message);
         }
 
         public static void WriteToFile(string filename, string value)

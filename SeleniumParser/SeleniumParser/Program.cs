@@ -12,40 +12,42 @@ namespace SeleniumParser
         // 400,000 selling once or twice a week
         // 100,000 selling one design a day
         // 2,000 25-50 a day
-        static int MaximumBSR = 2000;
-        static int NumberOfProductsToFind = 20;
+        static int MaximumBSR = 100000;
+        static int NumberOfProductsToFind = 50;
         static int NumberOfPagesToGiveUpAfter = 100;
 
         static string SearchCategory = "Clothing, Shoes & Jewelry";
 
-        static List<string> SearchTerms = new List<string> { "cat t shirt", "cat saying t shirt", "dog saying t shirt", "funny saying t shirt", "motivational t shirt"};
+        static List<string> SearchTerms = new List<string> { "cat t shirt", "motivational t shirt", "saying t shirt", "cat saying t shirt", "dog saying t shirt", "funny saying t shirt", "french bulldog t shirt", "pug t shirt", "funny saying t shirt", "coffee t shirt"};
         static List<string> CategoriesToConsider = new List<string> { "T-Shirts", "Tank Tops", "T-Shirts & Tanks", "Tanks & Camis" };
         
         static void Main(string[] args)
         {
-            ChromeOptions options = new ChromeOptions();
-            // When launching chrome, configure it not to load images as this will slow down the page load times
-            options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
-            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options);
-            driver.Url = "http://www.amazon.com";
-            Utils.WaitForPageToLoad();
+            var driver = Utils.CreateDriver();
 
             foreach (var term in SearchTerms)
             {
-                // Look up the term using the search bar
-                SearchUsingAmazonSearchBar(driver, term);
-
-                Utils.WaitForPageToLoad();
-
-                int numberOfPagesSearched = 0;
-                int numberOfProductsFound = 0;
-                // Keep looking until we have found the requested number of products OR we have searched too many pages
-                while (numberOfProductsFound < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
+                try
                 {
-                    numberOfProductsFound += FindProductsWorthConsideringOnCurrentPage(driver, term);
+                    var recoveryUrl = driver.Url;
+                    FindProductsForTerm(driver, term);
+                }
+                catch (OpenQA.Selenium.NoSuchWindowException e)
+                {
+                    // Sometimes chrome will run out of memory resulting in a no such window exception
+                    Utils.WriteError("Re-instantiating driver due to no such window exception");
 
-                    Utils.MoveToNextPage(driver);
-                    numberOfPagesSearched++;
+                    try
+                    {
+                        // Try to close the current driver down
+                        driver.Close();
+                    }
+                    catch { } // Catch anything that might happen and move on
+
+                    driver = Utils.CreateDriver();
+
+                    // And start looking for this term again
+                    FindProductsForTerm(driver, term);
                 }
             }
 
@@ -53,6 +55,25 @@ namespace SeleniumParser
 
             // Close the browser
             driver.Close();
+        }
+
+        private static void FindProductsForTerm(IWebDriver driver, string term)
+        {
+            // Look up the term using the search bar
+            SearchUsingAmazonSearchBar(driver, term);
+
+            Utils.WaitForPageToLoad();
+
+            int numberOfPagesSearched = 0;
+            int numberOfProductsFound = 0;
+            // Keep looking until we have found the requested number of products OR we have searched too many pages
+            while (numberOfProductsFound < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
+            {
+                numberOfProductsFound += FindProductsWorthConsideringOnCurrentPage(driver, term, numberOfProductsFound);
+
+                Utils.MoveToNextPage(driver);
+                numberOfPagesSearched++;
+            }
         }
 
         public static void SearchUsingAmazonSearchBar(IWebDriver driver, string searchTerm)
@@ -77,7 +98,7 @@ namespace SeleniumParser
             searchButton.Click();
         }
 
-        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term)
+        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term, int currentProductsFound)
         {
             int numberFound = 0;
             // Take a copy of the current page, so that we can return to this after evaluating each product
@@ -97,12 +118,18 @@ namespace SeleniumParser
                     {
                         numberFound++;
                         Utils.WriteToFile(term, consideration);
+                        
+                        // Stop as soon as we have found the required number of products
+                        if (numberFound + currentProductsFound > NumberOfProductsToFind)
+                        {
+                            break;
+                        }
                     }
                 }
                 catch(Exception e)
                 {
                     // Catch and keep on powering on!
-                    Utils.WriteToFile("Error", "Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
+                    Utils.WriteError("Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
                 }
             }
 

@@ -114,18 +114,21 @@ namespace SeleniumParser
         
         static void Main(string[] args)
         {
+
+            // Identify the current running chrome processes, so that we do not kill them if we fail during product search
+            List<int> chromePids = GetRunningChromeProcessIds();
+
+            // Create our driver after getting the running chrome instances
             var driver = Utils.CreateDriver();
 
-            bool continueLooping = true;
             int searchTermIndex = 0;
+            bool continueLooping = true;
             int attemptsForSearchTerm = 0;
-
+            
             while (continueLooping)
             {
                 try
                 {
-                    throw new Exception();
-
                     var recoveryUrl = driver.Url;
                     FindProductsForTerm(driver, SearchTerms[searchTermIndex]);
 
@@ -154,21 +157,10 @@ namespace SeleniumParser
                         attemptsForSearchTerm = 0;
                     }
 
-                    Utils.WriteError("Re-instantiating driver due to exception");
-
                     try
                     {
-                        // Try to close the current driver down
-                        driver.Close();
-
-                        // Kill any running instances of google chrome
-                        foreach (var process in Process.GetProcessesByName("Chrome"))
-                        {
-                            process.Kill();
-                        }
-
-                        // Start again...
-                        driver = Utils.CreateDriver();
+                        Utils.WriteError("Re-instantiating driver due to exception");
+                        driver = RecoverWebDriver(chromePids, driver);
                     }
                     catch { } // Catch anything that might happen and try again move on
 
@@ -180,6 +172,44 @@ namespace SeleniumParser
 
             // Close the browser
             driver.Close();
+        }
+
+        private static IWebDriver RecoverWebDriver(List<int> chromePids, IWebDriver driver)
+        {
+            // Try to close the current driver down
+            driver.Close();
+
+            KillChromeProcesses(chromePids);
+
+            // Start again...
+            driver = Utils.CreateDriver();
+            return driver;
+        }
+
+        private static void KillChromeProcesses(List<int> chromePids)
+        {
+            // Kill any running instances of google chrome
+            foreach (var process in Process.GetProcessesByName("Chrome"))
+            {
+                // Only kill the process if it was not running before we created the driver
+                if (!chromePids.Contains(process.Id))
+                {
+                    process.Kill();
+                }
+            }
+        }
+
+        private static List<int> GetRunningChromeProcessIds()
+        {
+            List<int> chromePids = new List<int>();
+
+            // Kill any running instances of google chrome
+            foreach (var process in Process.GetProcessesByName("Chrome"))
+            {
+                chromePids.Add(process.Id);
+            }
+
+            return chromePids;
         }
 
         private static void FindProductsForTerm(IWebDriver driver, string term)

@@ -114,16 +114,16 @@ namespace SeleniumParser
         
         static void Main(string[] args)
         {
-
             // Identify the current running chrome processes, so that we do not kill them if we fail during product search
             List<int> chromePids = GetRunningChromeProcessIds();
 
             // Create our driver after getting the running chrome instances
-            var driver = Utils.CreateDriver();
+            var driver = Driver.Make();
 
             int searchTermIndex = 0;
             bool continueLooping = true;
             int attemptsForSearchTerm = 0;
+            int maximumAttemptsToSearchForTerm = 3;
             
             while (continueLooping)
             {
@@ -148,23 +148,22 @@ namespace SeleniumParser
                 catch // Catch anything and keep trying
                 {
                     // Something bad has happened during our search for this term.
-                    if (++attemptsForSearchTerm == 3)
+                    if (++attemptsForSearchTerm == maximumAttemptsToSearchForTerm)
                     {
                         // We have failed to search for this term 3 times, move to the next term
-                        Utils.WriteError("Giving up on search term " + SearchTerms[searchTermIndex] + " as maximum retries exceeded");
+                        Log.Error("Giving up on search term " + SearchTerms[searchTermIndex] + " as maximum retries exceeded");
 
                         searchTermIndex++;
                         attemptsForSearchTerm = 0;
                     }
 
-                    try
-                    {
-                        Utils.WriteError("Re-instantiating driver due to exception");
-                        driver = RecoverWebDriver(chromePids, driver);
-                    }
-                    catch { } // Catch anything that might happen and try again move on
+                    Log.Error("Attempting to clean up old web driver");
+                    TryToCleanUpFromException(chromePids, driver);
 
-                    // We will retry the last search term that the failure occurred from from this point onwards
+                    // Now that we have tried to recover by cleaning up, create a new web driver
+                    driver = Driver.Make();
+                    
+                    // Frin this point on we will retry the last search term with an incremented attempt count (so that we do not loop forever on a crap search term)
                 }
             }
 
@@ -174,18 +173,39 @@ namespace SeleniumParser
             driver.Close();
         }
 
-        private static IWebDriver RecoverWebDriver(List<int> chromePids, IWebDriver driver)
+        /// <summary>
+        /// Moves to the next page of search results
+        /// </summary>
+        /// <param name="driver"></param>
+        private static void MoveToNextPageOfSearchResults(IWebDriver driver)
         {
-            // Try to close the current driver down
-            driver.Close();
+            driver.FindElement(By.Id("pagnNextString")).Click();
 
-            KillChromeProcesses(chromePids);
-
-            // Start again...
-            driver = Utils.CreateDriver();
-            return driver;
+            Driver.WaitForPageToLoad();
         }
 
+        /// <summary>
+        /// Kill chrome processes started be selenium and try and close the driver
+        /// </summary>
+        /// <param name="chromePids"></param>
+        /// <param name="driver"></param>
+        private static void TryToCleanUpFromException(List<int> chromePids, IWebDriver driver)
+        {
+            try
+            {
+                // Try to close the current driver down
+                KillChromeProcesses(chromePids);
+
+                // Trying to close the chrome driver when the window has been closed will likely throw out some sort of selenium exception
+                driver.Close();
+            }
+            catch { } // Ignore failures during cleanup - try and move on from this disaster!
+        }
+
+        /// <summary>
+        /// Kills all chrome processes except those specified in parameters
+        /// </summary>
+        /// <param name="chromePids"></param>
         private static void KillChromeProcesses(List<int> chromePids)
         {
             // Kill any running instances of google chrome
@@ -199,6 +219,10 @@ namespace SeleniumParser
             }
         }
 
+        /// <summary>
+        /// Gets process ids of all currently running chrome instances and extensions
+        /// </summary>
+        /// <returns></returns>
         private static List<int> GetRunningChromeProcessIds()
         {
             List<int> chromePids = new List<int>();
@@ -212,26 +236,78 @@ namespace SeleniumParser
             return chromePids;
         }
 
+        /// <summary>
+        /// Iterates through search results until:
+        /// 1. The configured number of products has been found
+        /// 2. The configured number of search pages has been exceeded
+        /// </summary>
+        /// <param name="driver"></param>
+        /// <param name="term"></param>
         private static void FindProductsForTerm(IWebDriver driver, string term)
         {
             // Look up the term using the search bar
             SearchUsingAmazonSearchBar(driver, term);
 
-            Utils.WaitForPageToLoad();
+            Driver.WaitForPageToLoad();
 
             int numberOfPagesSearched = 0;
             int numberOfProductsFound = 0;
+
             // Keep looking until we have found the requested number of products OR we have searched too many pages
             while (numberOfProductsFound < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
             {
                 numberOfProductsFound += FindProductsWorthConsideringOnCurrentPage(driver, term, numberOfProductsFound);
 
-                Utils.MoveToNextPage(driver);
+                MoveToNextPageOfSearchResults(driver);
                 numberOfPagesSearched++;
             }
         }
 
-        public static void SearchUsingAmazonSearchBar(IWebDriver driver, string searchTerm)
+        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term, int currentProductsFound)
+        {
+            int numberFound = 0;
+            // Take a copy of the current page, so that we can return to this after evaluating each product
+            var productPageLink = driver.Url;
+
+            foreach (var productLink in GetProductLinksOnPage(driver))
+            {
+                // Add some space on console before outputting where we are going
+                Log.BlankLines(2);
+                Driver.GoToLink(driver, productLink);
+
+                try
+                {
+                    var consideration = GetDesignConsideration(driver);
+
+                    if (consideration.BestSellerCategoryToRank.Count > 0)
+                    {
+                        numberFound++;
+                        Log.SuccessDescriptor(term, consideration);
+
+                        // Stop as soon as we have found the required number of products
+                        if (numberFound + currentProductsFound > NumberOfProductsToFind)
+                        {
+                            break;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Catch and keep on powering on!
+                    Log.Error("Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
+                }
+            }
+
+            // Go back to the product page after looking at all of the products
+            Driver.GoToLink(driver, productPageLink);
+
+            return numberFound;
+        }
+
+        /// <summary>
+        /// Selects the configured category from the dropdown list next to the search bar
+        /// </summary>
+        private static void SelectProductCategoryForSearchBar(IWebDriver driver)
         {
             // Ensure that we are searching with the right category. Each category apparently has different page formatting
             var categoryDropdown = driver.FindElement(By.ClassName("nav-search-dropdown"));
@@ -239,6 +315,16 @@ namespace SeleniumParser
 
             // Select the required category
             selectElementDropdown.SelectByText(SearchCategory);
+        }
+
+        /// <summary>
+        /// Chooses product category, and then searches for the specified term by typing into search box and clicking the search button
+        /// </summary>
+        /// <param name="driver"></param>
+        /// <param name="searchTerm"></param>
+        public static void SearchUsingAmazonSearchBar(IWebDriver driver, string searchTerm)
+        {
+            SelectProductCategoryForSearchBar(driver);
 
             // Get the search box
             IWebElement searchBox = driver.FindElement(By.Id("twotabsearchtextbox"));
@@ -253,47 +339,11 @@ namespace SeleniumParser
             searchButton.Click();
         }
 
-        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term, int currentProductsFound)
-        {
-            int numberFound = 0;
-            // Take a copy of the current page, so that we can return to this after evaluating each product
-            var productPageLink = driver.Url;
-
-            foreach (var productLink in GetProductLinksOnPage(driver))
-            {
-                // Add some space on console before outputting where we are going
-                Utils.WriteBlankLines(2);
-                Utils.GoToLink(driver, productLink);
-
-                try
-                {
-                    var consideration = GetDesignConsideration(driver);
-
-                    if(consideration.BestSellerCategoryToRank.Count > 0)
-                    {
-                        numberFound++;
-                        Utils.WriteToFile(term, consideration);
-                        
-                        // Stop as soon as we have found the required number of products
-                        if (numberFound + currentProductsFound > NumberOfProductsToFind)
-                        {
-                            break;
-                        }
-                    }
-                }
-                catch(Exception e)
-                {
-                    // Catch and keep on powering on!
-                    Utils.WriteError("Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
-                }
-            }
-
-            // Go back to the product page after looking at all of the products
-            Utils.GoToLink(driver, productPageLink);
-
-            return numberFound;
-        }
-
+        /// <summary>
+        /// Get products on the search results page
+        /// </summary>
+        /// <param name="driver"></param>
+        /// <returns></returns>
         public static List<string> GetProductLinksOnPage(IWebDriver driver)
         {
             Console.WriteLine("Getting product links");
@@ -318,6 +368,12 @@ namespace SeleniumParser
             return strings;
         }
 
+        /// <summary>
+        /// Collects all bsr categories that are within the configured bsr rank threshold
+        /// Returns an empty collection of results when no categories matched
+        /// </summary>
+        /// <param name="driver"></param>
+        /// <returns></returns>
         static SuccessDescriptor GetDesignConsideration(IWebDriver driver)
         {
             // Find the sales rank section on the page - the topmost parent of the list of ranks that apply to the product
@@ -336,7 +392,7 @@ namespace SeleniumParser
                 // Only consdier if the rank is in one of the specified categories
                 if (CategoriesToConsider.Contains(categoryName))
                 {
-                    categoryName = Utils.ProcessCategoryName(rank, categoryName);
+                    categoryName = Driver.GetDescriptionOfBsrCategory(rank, categoryName);
 
                     // Trim off the hash from the rank
                     var rankingString = rank.FindElement(By.ClassName("zg_hrsr_rank")).Text.Substring(1);

@@ -8,8 +8,9 @@ namespace SeleniumParser
 {
     public class SuccessDescriptor
     {
-        public Dictionary<string, int> BestSellerCategoryToRank = new Dictionary<string,int>();
         public string Url;
+        public string Title;
+        public Dictionary<string, int> BestSellerCategoryToRank = new Dictionary<string, int>();
 
         public SuccessDescriptor(string url)
         {

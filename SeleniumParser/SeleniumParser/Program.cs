@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using System.Diagnostics;
 
 namespace SeleniumParser
 {
@@ -13,41 +14,165 @@ namespace SeleniumParser
         // 100,000 selling one design a day
         // 2,000 25-50 a day
         static int MaximumBSR = 100000;
-        static int NumberOfProductsToFind = 50;
+        static int NumberOfProductsToFind = 100;
         static int NumberOfPagesToGiveUpAfter = 100;
 
         static string SearchCategory = "Clothing, Shoes & Jewelry";
 
-        static List<string> SearchTerms = new List<string> { "cat t shirt", "motivational t shirt", "saying t shirt", "cat saying t shirt", "dog saying t shirt", "funny saying t shirt", "french bulldog t shirt", "pug t shirt", "funny saying t shirt", "coffee t shirt"};
-        static List<string> CategoriesToConsider = new List<string> { "T-Shirts", "Tank Tops", "T-Shirts & Tanks", "Tanks & Camis" };
+        static List<string> SearchTerms = new List<string> { 
+            "cat t shirt"
+            , "motivational t shirt"
+            , "motivational exercise t shirt"
+            , "saying t shirt"
+            , "donald trump t shirt"
+            , "anti donald trump t shirt"
+            , "political t shirt"
+            , "cat saying t shirt"
+            , "dog saying t shirt"
+            , "funny saying t shirt"
+            , "french bulldog t shirt"
+            , "pug t shirt"
+            , "funny saying t shirt"
+            , "coffee t shirt"
+            , "tea t shirt"
+            , "doughnut t shirt"
+            , "salty t shirt"
+            , "salty saying t shirt"
+            , "snatched t shirt"
+            , "werq t shirt"
+            , "slay t shirt"
+            , "yolo t shirt"
+            , "a crapella t shirt"
+            , "amazeballs t shirt"
+            , "askhole t shirt"
+            , "awesome sauce t shirt"
+            , "baby bump t shirt"
+            , "badassery t shirt"
+            , "beer me t shirt"
+            , "blamestorming t shirt"
+            , "bootylicious t shirt"
+            , "bromance t shirt"
+            , "bye felicia t shirt"
+            , "cougar t shirt"
+            , "designated drunk t shirt"
+            , "duck face t shirt"
+            , "fanboi t shirt"
+            , "fan girl t shirt"
+            , "fauxpology t shirt"
+            , "foodie t shirt"
+            , "frak t shirt"
+            , "friend zone t shirt"
+            , "fro yo t shirt"
+            , "fro-yo t shirt"
+            , "gaydar t shirt"
+            , "girl crush t shirt"
+            , "grrrl t shirt"
+            , "hangry t shirt"
+            , "hipster t shirt"
+            , "hot mess t shirt"
+            , "humblebrag t shirt"
+            , "jailbait t shirt"
+            , "knosh t shirt"
+            , "lol t shirt"
+            , "make it rain t shirt"
+            , "man boobs t shirt"
+            , "man cave t shirt"
+            , "man sweats t shirt"
+            , "milf t shirt"
+            , "netflix and chill t shirt"
+            , "ninja sex t shirt"
+            , "nom t shirt"
+            , "nontroversy t shirt"
+            , "nsfw t shirt"
+            , "party foul t shirt"
+            , "phat t shirt"
+            , "pregret t shirt"
+            , "pwned t shirt"
+            , "quantum physics t shirt"
+            , "ratchet t shirt"
+            , "rendezbooz t shirt"
+            , "rickroll t shirt"
+            , "said no one ever t shirt"
+            , "selfie t shirt"
+            , "sext t shirt"
+            , "side boob t shirt"
+            , "that's what she said t shirt"
+            , "trout t shirt"
+            , "twerk t shirt"
+            , "typeractive t shirt"
+            , "wtf t shirt"
+            , "yolo t shirt"
+            , "zombie t shirt"
+        };
+
+        static List<string> CategoriesToConsider = new List<string> { 
+            "T-Shirts"
+            , "Tank Tops"
+            , "T-Shirts & Tanks"
+            , "Tanks & Camis" 
+        };
         
         static void Main(string[] args)
         {
             var driver = Utils.CreateDriver();
 
-            foreach (var term in SearchTerms)
+            bool continueLooping = true;
+            int searchTermIndex = 0;
+            int attemptsForSearchTerm = 0;
+
+            while (continueLooping)
             {
                 try
                 {
+                    throw new Exception();
+
                     var recoveryUrl = driver.Url;
-                    FindProductsForTerm(driver, term);
+                    FindProductsForTerm(driver, SearchTerms[searchTermIndex]);
+
+                    // The search term has passed, set the attempts back to zero
+                    attemptsForSearchTerm = 0;
+
+                    // Add 1 to zero based index before seeing if we are at the end of the list
+                    if(searchTermIndex + 1 < SearchTerms.Count)
+                    {
+                        searchTermIndex++;
+                    }
+                    else
+                    {
+                        continueLooping = false;
+                    }
                 }
-                catch (OpenQA.Selenium.NoSuchWindowException e)
+                catch // Catch anything and keep trying
                 {
-                    // Sometimes chrome will run out of memory resulting in a no such window exception
-                    Utils.WriteError("Re-instantiating driver due to no such window exception");
+                    // Something bad has happened during our search for this term.
+                    if (++attemptsForSearchTerm == 3)
+                    {
+                        // We have failed to search for this term 3 times, move to the next term
+                        Utils.WriteError("Giving up on search term " + SearchTerms[searchTermIndex] + " as maximum retries exceeded");
+
+                        searchTermIndex++;
+                        attemptsForSearchTerm = 0;
+                    }
+
+                    Utils.WriteError("Re-instantiating driver due to exception");
 
                     try
                     {
                         // Try to close the current driver down
                         driver.Close();
+
+                        // Kill any running instances of google chrome
+                        foreach (var process in Process.GetProcessesByName("Chrome"))
+                        {
+                            process.Kill();
+                        }
+
+                        // Start again...
+                        driver = Utils.CreateDriver();
                     }
-                    catch { } // Catch anything that might happen and move on
+                    catch { } // Catch anything that might happen and try again move on
 
-                    driver = Utils.CreateDriver();
-
-                    // And start looking for this term again
-                    FindProductsForTerm(driver, term);
+                    // We will retry the last search term that the failure occurred from from this point onwards
                 }
             }
 
@@ -189,7 +314,10 @@ namespace SeleniumParser
 
                     if( rankingInt <= MaximumBSR)
                     {
-                        Console.WriteLine("Considered with ranking " + rankingString + " for category " + categoryName);
+                        // Store the title for this product now that we want to consider it (delayed DOM query to increase efficiency)
+                        var productTitle = driver.FindElement(By.Id("title")).Text;
+                        Console.WriteLine(productTitle + " considered with ranking " + rankingString + " for category " + categoryName);
+                        successDescription.Title = productTitle;
 
                         // Store the category and its associated rank. A product may be successful across different categories!
                         successDescription.BestSellerCategoryToRank.Add(categoryName, rankingInt);

@@ -60,7 +60,9 @@ namespace SeleniumParser
 
         public static void WriteToFile(string filename, string value)
         {
-            using (var writer = File.AppendText(OutputFileDir + filename + ".txt"))
+            var outputFileName = OutputFileDir + filename + ".txt";
+            Console.WriteLine("Writing to " + outputFileName + ": " + value);
+            using (var writer = File.AppendText(outputFileName))
             {
                 writer.WriteLine(value);
             }
@@ -68,23 +70,20 @@ namespace SeleniumParser
 
         public static void WriteToFile(string term, SuccessDescriptor result)
         {
-            using (var writer = File.AppendText(OutputFileDir + term + ".txt"))
+            var filename = OutputFileDir + term + ".csv";
+            // If the file does not exist add the header columns
+            var fileExists = File.Exists(filename);
+
+            using (var writer = File.AppendText(filename))
             {
+                if (!fileExists)
+                {
+                    writer.WriteLine("Title, Category, BSR, URL");
+                }
+
                 foreach (var value in result.BestSellerCategoryToRank)
                 {
-                    writer.WriteLine(value.Key + ", " + value.Value + ", " + result.Url);
-                }
-            }
-        }
-
-        public static void WriteLinksToFileForSearchTerm(string term, List<string> productLinks)
-        {
-            using (var writer = File.AppendText(OutputFileDir + term + ".txt"))
-            {
-                writer.WriteLine("Links for " + term);
-                foreach (var link in productLinks)
-                {
-                    writer.WriteLine(link);
+                    writer.WriteLine(result.Title + ", " + value.Key + ", " + value.Value + ", " + result.Url);
                 }
             }
         }

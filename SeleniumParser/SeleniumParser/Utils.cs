@@ -51,36 +51,5 @@ namespace SeleniumParser
             Thread.Sleep(PageLoadDuration);
         }
 
-        /// <summary>
-        /// Gets a better description of the best seller rank category if there are multiple sub categories that have the same name.
-        /// I.e. T-Shirts can be found under Men and Women sub categories
-        /// </summary>
-        /// <param name="rank"></param>
-        /// <param name="categoryName"></param>
-        /// <returns></returns>
-        public static string GetDescriptionOfBsrCategory(IWebElement rank, string categoryName)
-        {
-            if (categoryName == "T-Shirts")
-            {
-                // Determine whether or not it is for men or women
-                var ladder = rank.FindElement(By.ClassName("zg_hrsr_ladder"));
-                var ladderCategories = ladder.FindElements(By.CssSelector("a"));
-
-                foreach (var ladderValue in ladderCategories)
-                {
-                    if (ladderValue.Text == "Women")
-                    {
-                        categoryName = "Women's " + categoryName;
-                        break;
-                    }
-                    else if (ladderValue.Text == "Men")
-                    {
-                        categoryName = "Men's " + categoryName;
-                        break;
-                    }
-                }
-            }
-            return categoryName;
-        }
     }
 }

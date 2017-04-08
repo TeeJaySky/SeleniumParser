@@ -94,8 +94,8 @@ namespace SeleniumParser
         /// Output may contain more than one product category to url mapping
         /// </summary>
         /// <param name="fileName"></param>
-        /// <param name="result"></param>
-        public static void SuccessDescriptor(string fileName, SuccessDescriptor result)
+        /// <param name="rankings"></param>
+        public static void BsrRankings(string fileName, IEnumerable<BsrRank> rankings)
         {
             var outputFileName = OutputFileDir + fileName + ".csv";
             
@@ -109,10 +109,9 @@ namespace SeleniumParser
                     writer.WriteLine("Title, Category, BSR, URL");
                 }
 
-                foreach (var value in result.BestSellerCategoryToRank)
+                foreach(var ranking in rankings)
                 {
-                    var marketInfo = ToCsv(result.Title, value.Key, value.Value.ToString(), result.Url);
-                    writer.WriteLine(marketInfo);
+                    writer.WriteLine(rankings);
                 }
             }
         }

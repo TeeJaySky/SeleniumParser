@@ -130,7 +130,7 @@ namespace SeleniumParser
                 try
                 {
                     var recoveryUrl = driver.Url;
-                    FindProductsForTerm(driver, SearchTerms[searchTermIndex]);
+                    FindProductsForSearchTerm(driver, SearchTerms[searchTermIndex]);
 
                     // The search term has passed, set the attempts back to zero
                     attemptsForSearchTerm = 0;
@@ -242,11 +242,11 @@ namespace SeleniumParser
         /// 2. The configured number of search pages has been exceeded
         /// </summary>
         /// <param name="driver"></param>
-        /// <param name="term"></param>
-        private static void FindProductsForTerm(IWebDriver driver, string term)
+        /// <param name="searchTerm"></param>
+        private static void FindProductsForSearchTerm(IWebDriver driver, string searchTerm)
         {
             // Look up the term using the search bar
-            SearchUsingAmazonSearchBar(driver, term);
+            SearchUsingAmazonSearchBar(driver, searchTerm);
 
             Driver.WaitForPageToLoad();
 
@@ -254,54 +254,74 @@ namespace SeleniumParser
             int numberOfProductsFound = 0;
 
             // Keep looking until we have found the requested number of products OR we have searched too many pages
-            while (numberOfProductsFound < NumberOfProductsToFind && numberOfPagesSearched < NumberOfPagesToGiveUpAfter)
+            while (!StopSearchingProduct(numberOfPagesSearched, numberOfProductsFound))
             {
-                numberOfProductsFound += FindProductsWorthConsideringOnCurrentPage(driver, term, numberOfProductsFound);
+                var productPageLink = driver.Url;
+                var productLinks = GetProductLinksOnPage(driver);
 
+                foreach (var product in productLinks)
+                {
+                    var rankings = FindRankingsForProduct(driver, product);
+                    Log.BsrRankings(searchTerm, rankings);
+
+                    // Don't continue processing products on this page if we have found enough
+                    if (EnoughProductsHaveBeenFound(++numberOfProductsFound))
+                    {
+                        break;
+                    }
+                }
+
+                // Go back to the product page after looking at all of the products
+                Driver.GoToLink(driver, productPageLink);
                 MoveToNextPageOfSearchResults(driver);
+
                 numberOfPagesSearched++;
             }
         }
 
-        private static int FindProductsWorthConsideringOnCurrentPage(IWebDriver driver, string term, int currentProductsFound)
+        /// <summary>
+        /// Determines whether or not we have exceeded the thresholds for number of products found or number of pages searched
+        /// </summary>
+        /// <param name="numberOfPagesSearched"></param>
+        /// <param name="numberOfProductsFound"></param>
+        /// <returns></returns>
+        private static bool StopSearchingProduct(int numberOfPagesSearched, int numberOfProductsFound)
         {
-            int numberFound = 0;
-            // Take a copy of the current page, so that we can return to this after evaluating each product
-            var productPageLink = driver.Url;
+            return  EnoughProductsHaveBeenFound(numberOfProductsFound) ||
+                    EnoughPagesHaveBeenSearched(numberOfPagesSearched);
+        }
 
-            foreach (var productLink in GetProductLinksOnPage(driver))
-            {
-                // Add some space on console before outputting where we are going
-                Log.BlankLines(2);
-                Driver.GoToLink(driver, productLink);
+        /// <summary>
+        /// Returns whether enough pages have been searched based off configured value
+        /// </summary>
+        /// <param name="numberOfPagesSearched"></param>
+        /// <returns></returns>
+        private static bool EnoughPagesHaveBeenSearched(int numberOfPagesSearched)
+        {
+            return numberOfPagesSearched < NumberOfPagesToGiveUpAfter;
+        }
 
-                try
-                {
-                    var consideration = GetDesignConsideration(driver);
+        /// <summary>
+        /// Returns whether enough products have been searched based off configured value
+        /// </summary>
+        /// <param name="numberFound"></param>
+        /// <returns></returns>
+        private static bool EnoughProductsHaveBeenFound(int numberFound)
+        {
+            return numberFound > NumberOfProductsToFind;
+        }
 
-                    if (consideration.BestSellerCategoryToRank.Count > 0)
-                    {
-                        numberFound++;
-                        Log.SuccessDescriptor(term, consideration);
+        /// <summary>
+        /// Go to the product page and find its bsr rankings
+        /// </summary>
+        /// <param name="driver"></param>
+        /// <param name="productLink"></param>
+        /// <returns></returns>
+        private static IEnumerable<BsrRank> FindRankingsForProduct(IWebDriver driver, string productLink)
+        {
+            Driver.GoToLink(driver, productLink);
 
-                        // Stop as soon as we have found the required number of products
-                        if (numberFound + currentProductsFound > NumberOfProductsToFind)
-                        {
-                            break;
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    // Catch and keep on powering on!
-                    Log.Error("Exception caught trying to consider " + productLink + ". Exception: " + e.Message);
-                }
-            }
-
-            // Go back to the product page after looking at all of the products
-            Driver.GoToLink(driver, productPageLink);
-
-            return numberFound;
+            return GetRankings(driver);
         }
 
         /// <summary>
@@ -374,44 +394,55 @@ namespace SeleniumParser
         /// </summary>
         /// <param name="driver"></param>
         /// <returns></returns>
-        static SuccessDescriptor GetDesignConsideration(IWebDriver driver)
+        static IEnumerable<BsrRank> GetRankings(IWebDriver driver)
         {
-            // Find the sales rank section on the page - the topmost parent of the list of ranks that apply to the product
-            var salesRank = driver.FindElement(By.ClassName("zg_hrsr"));
+            List<BsrRank> bsrRanks = new List<BsrRank>();
 
-            SuccessDescriptor successDescription = new SuccessDescriptor(driver.Url);
-
-            // Find the list of items in this container
-            var ranks = salesRank.FindElements(By.CssSelector("li"));
-
-            foreach (var rank in ranks)
+            try
             {
-                // The text is in a b tag
-                var categoryName = rank.FindElement(By.CssSelector("b")).Text;
+                // Find the sales rank section on the page - the topmost parent of the list of ranks that apply to the product
+                var salesRank = driver.FindElement(By.ClassName("zg_hrsr"));
 
-                // Only consdier if the rank is in one of the specified categories
-                if (CategoriesToConsider.Contains(categoryName))
+                // Find the list of items in this container
+                var ranks = salesRank.FindElements(By.CssSelector("li"));
+
+                foreach (var rank in ranks)
                 {
-                    categoryName = Driver.GetDescriptionOfBsrCategory(rank, categoryName);
+                    // The text is in a b tag
+                    var categoryName = rank.FindElement(By.CssSelector("b")).Text;
 
-                    // Trim off the hash from the rank
-                    var rankingString = rank.FindElement(By.ClassName("zg_hrsr_rank")).Text.Substring(1);
-                    var rankingInt = Convert.ToInt32(rankingString);
-
-                    if( rankingInt <= MaximumBSR)
+                    // Only consdier if the rank is in one of the specified categories
+                    if (CategoriesToConsider.Contains(categoryName))
                     {
-                        // Store the title for this product now that we want to consider it (delayed DOM query to increase efficiency)
-                        var productTitle = driver.FindElement(By.Id("title")).Text;
-                        Console.WriteLine(productTitle + " considered with ranking " + rankingString + " for category " + categoryName);
-                        successDescription.Title = productTitle;
+                        // Trim off the hash from the rank
+                        var rankingString = rank.FindElement(By.ClassName("zg_hrsr_rank")).Text.Substring(1);
+                        var rankingInt = Convert.ToInt32(rankingString);
 
-                        // Store the category and its associated rank. A product may be successful across different categories!
-                        successDescription.BestSellerCategoryToRank.Add(categoryName, rankingInt);
+                        if (rankingInt <= MaximumBSR)
+                        {
+                            // Store the title for this product now that we want to consider it (delayed DOM query to increase efficiency)
+                            var productTitle = driver.FindElement(By.Id("title")).Text;
+
+                            // Add the ranking to the collection that we want to look at
+                            bsrRanks.Add(new BsrRank ( 
+                                driver.Url 
+                                , productTitle
+                                , categoryName
+                                , rank
+                                , rankingString
+                            ));
+                        }
                     }
                 }
             }
+            catch (Exception e)
+            {
+                // If the product is really crap, it may not rank on anything
+                // Catch exception thrown in this case and just move on...
+                Log.Error("Exception caught trying to consider " + driver.Url + ". Exception: " + e.Message);
+            }
 
-            return successDescription;
+            return bsrRanks;
         }
     }
 }

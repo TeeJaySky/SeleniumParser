@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Diagnostics;
 using System.Collections.Generic;
 
 using OpenQA.Selenium;
@@ -8,7 +9,7 @@ using OpenQA.Selenium.Support.UI;
 
 namespace SeleniumParser
 {
-    public class Driver
+    public class DriverUtils
     {
         static int PageLoadDuration = 0;
 
@@ -36,8 +37,6 @@ namespace SeleniumParser
         /// <param name="url"></param>
         public static void GoToLink(IWebDriver driver, string url)
         {
-            //Console.WriteLine("Navigating to: " + url);
-
             driver.Url = url;
 
             WaitForPageToLoad();
@@ -51,6 +50,5 @@ namespace SeleniumParser
             // Wait for page to load
             Thread.Sleep(PageLoadDuration);
         }
-
     }
 }

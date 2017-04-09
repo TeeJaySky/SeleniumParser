@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SeleniumParser
 {
@@ -9,6 +10,8 @@ namespace SeleniumParser
         static string LogFileName = "Log.csv";
         static string ResultsFileName = "Results.csv";
         static string OutputFileDir = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\";
+        static Object logFileLock = new Object();
+        static Object resultFileLock = new Object();
 
         /// <summary>
         /// Create csv string from inputs
@@ -17,18 +20,6 @@ namespace SeleniumParser
         public static string ToCsv(params string[] inputs)
         {
             return string.Join(", ", inputs);
-        }
-
-        /// <summary>
-        /// Write specified number of blank lines onto console
-        /// </summary>
-        /// <param name="number"></param>
-        public static void BlankLines(int number = 1)
-        {
-            for (int i = 0; i < number; i++)
-            {
-                Console.WriteLine("");
-            }
         }
 
         /// <summary>
@@ -57,12 +48,15 @@ namespace SeleniumParser
         /// <param name="logLevel"></param>
         private static void LogMessage(string message, string logLevel)
         {
-            // Create the log file message as csv with date stamp
-            string logMessage = ToCsv(DateTime.Now.ToString(), logLevel, message);
+            lock(logFileLock)
+            {
+                // Create the log file message as csv with date stamp
+                string logMessage = ToCsv(Thread.CurrentThread.ManagedThreadId.ToString(), DateTime.Now.ToString(), logLevel, message);
 
-            // Write to console and file
-            Console.WriteLine(logMessage);
-            WriteToLogFile(logMessage);
+                // Write to console and file
+                Console.WriteLine(logMessage);
+                WriteToLogFile(logMessage);
+            }
         }
 
         /// <summary>
@@ -82,7 +76,7 @@ namespace SeleniumParser
                 if (!fileExists)
                 {
                     // Create the log file with column headers if it has not been created before
-                    var columnHeaders = ToCsv("DateStamp", "LogLevel", "Message");
+                    var columnHeaders = ToCsv("ThreadID", "DateStamp", "LogLevel", "Message");
                     writer.WriteLine(columnHeaders);
                 }
 
@@ -98,21 +92,24 @@ namespace SeleniumParser
         /// <param name="rankings"></param>
         public static void BsrRankings(IEnumerable<BsrRank> rankings)
         {
-            var outputFileName = OutputFileDir + ResultsFileName;
-            
-            var fileExists = File.Exists(outputFileName);
-
-            using (var writer = File.AppendText(outputFileName))
+            lock(resultFileLock)
             {
-                // If the file does not exists, write the column headings
-                if (!fileExists)
-                {
-                    writer.WriteLine("Search Term, Title, Category, BSR, URL");
-                }
+                var outputFileName = OutputFileDir + ResultsFileName;
 
-                foreach(var ranking in rankings)
+                var fileExists = File.Exists(outputFileName);
+
+                using (var writer = File.AppendText(outputFileName))
                 {
-                    writer.WriteLine(ranking.ToString());
+                    // If the file does not exists, write the column headings
+                    if (!fileExists)
+                    {
+                        writer.WriteLine("Search Term, Title, Category, BSR, URL");
+                    }
+
+                    foreach (var ranking in rankings)
+                    {
+                        writer.WriteLine(ranking.ToString());
+                    }
                 }
             }
         }

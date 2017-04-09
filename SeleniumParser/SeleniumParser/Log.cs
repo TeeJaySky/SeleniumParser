@@ -4,9 +4,10 @@ using System.Collections.Generic;
 
 namespace SeleniumParser
 {
-    class Log
+    public class Log
     {
-        static string LogFileName = "Log";
+        static string LogFileName = "Log.csv";
+        static string ResultsFileName = "Results.csv";
         static string OutputFileDir = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\";
 
         /// <summary>
@@ -72,7 +73,7 @@ namespace SeleniumParser
         /// <param name="logLevel"></param>
         private static void WriteToLogFile(string message)
         {
-            var outputFileName = OutputFileDir + LogFileName + ".csv";
+            var outputFileName = OutputFileDir + LogFileName;
             
             var fileExists = File.Exists(outputFileName);
 
@@ -95,9 +96,9 @@ namespace SeleniumParser
         /// </summary>
         /// <param name="fileName"></param>
         /// <param name="rankings"></param>
-        public static void BsrRankings(string fileName, IEnumerable<BsrRank> rankings)
+        public static void BsrRankings(IEnumerable<BsrRank> rankings)
         {
-            var outputFileName = OutputFileDir + fileName + ".csv";
+            var outputFileName = OutputFileDir + ResultsFileName;
             
             var fileExists = File.Exists(outputFileName);
 
@@ -106,12 +107,12 @@ namespace SeleniumParser
                 // If the file does not exists, write the column headings
                 if (!fileExists)
                 {
-                    writer.WriteLine("Title, Category, BSR, URL");
+                    writer.WriteLine("Search Term, Title, Category, BSR, URL");
                 }
 
                 foreach(var ranking in rankings)
                 {
-                    writer.WriteLine(rankings);
+                    writer.WriteLine(ranking.ToString());
                 }
             }
         }

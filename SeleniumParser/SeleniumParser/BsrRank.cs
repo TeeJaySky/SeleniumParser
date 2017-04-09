@@ -13,16 +13,28 @@ namespace SeleniumParser
         public string Title;
         public string ProductCategory;
         public string Rank;
+        public string SearchTerm;
 
-        public BsrRank(string url, string title, string productCategory, IWebElement rankElement, string rank)
+        public BsrRank(string url, string title, string productCategory, IWebElement rankElement, string rank, string searchTerm)
         {
-            Url = url;
-            Title = title;
-            Rank = rank;
+            Url = RemoveCommas(url);
+            Title = RemoveCommas(title);
+            Rank = RemoveCommas(rank);
+            SearchTerm = RemoveCommas(searchTerm);
 
-            ProductCategory = GetDescriptionOfBsrCategory(rankElement, productCategory);
+            ProductCategory = RemoveCommas(GetDescriptionOfBsrCategory(rankElement, productCategory));
 
             Log.Info(title + " considered with ranking " + rank + " for category " + productCategory);
+        }
+
+        /// <summary>
+        /// Remove unwanted commas from the input string
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static string RemoveCommas(string input)
+        {
+            return input.Replace(",", "");
         }
 
         /// <summary>
@@ -62,7 +74,7 @@ namespace SeleniumParser
         /// </summary>
         /// <returns></returns>
         public override string ToString() {
-            return Log.ToCsv(Title, ProductCategory, Rank, Url);
+            return Log.ToCsv(SearchTerm, Title, ProductCategory, Rank, Url);
         }  
     }
 }

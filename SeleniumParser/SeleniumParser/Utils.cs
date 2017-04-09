@@ -36,7 +36,8 @@ namespace SeleniumParser
         /// <param name="url"></param>
         public static void GoToLink(IWebDriver driver, string url)
         {
-            Console.WriteLine("Navigating to: " + url);
+            //Console.WriteLine("Navigating to: " + url);
+
             driver.Url = url;
 
             WaitForPageToLoad();

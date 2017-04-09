@@ -135,12 +135,10 @@ namespace SeleniumParser
                     // The search term has passed, set the attempts back to zero
                     attemptsForSearchTerm = 0;
 
-                    // Add 1 to zero based index before seeing if we are at the end of the list
-                    if(searchTermIndex + 1 < SearchTerms.Count)
-                    {
-                        searchTermIndex++;
-                    }
-                    else
+                    searchTermIndex++;
+
+                    // If we have hit the count of the elements then we are done!
+                    if(searchTermIndex == SearchTerms.Count)
                     {
                         continueLooping = false;
                     }
@@ -248,8 +246,6 @@ namespace SeleniumParser
             // Look up the term using the search bar
             SearchUsingAmazonSearchBar(driver, searchTerm);
 
-            Driver.WaitForPageToLoad();
-
             int numberOfPagesSearched = 0;
             int numberOfProductsFound = 0;
 
@@ -259,23 +255,31 @@ namespace SeleniumParser
                 var productPageLink = driver.Url;
                 var productLinks = GetProductLinksOnPage(driver);
 
+                if (productLinks.Count == 0)
+                {
+                    throw new Exception("No product links found. Move onto next product");
+                }
+
                 foreach (var product in productLinks)
                 {
-                    var rankings = FindRankingsForProduct(driver, product);
-                    Log.BsrRankings(searchTerm, rankings);
+                    var rankings = FindRankingsForProduct(driver, product, searchTerm);
+                    Log.BsrRankings(rankings);
 
-                    // Don't continue processing products on this page if we have found enough
                     if (EnoughProductsHaveBeenFound(++numberOfProductsFound))
                     {
+                        // Don't continue processing products on this page if we have found enough
                         break;
                     }
                 }
 
-                // Go back to the product page after looking at all of the products
-                Driver.GoToLink(driver, productPageLink);
-                MoveToNextPageOfSearchResults(driver);
-
-                numberOfPagesSearched++;
+                // Move to the next page if we have not yet found enough products
+                if (!EnoughProductsHaveBeenFound(numberOfProductsFound))
+                {
+                    // Go back to the product page after looking at all of the products
+                    Driver.GoToLink(driver, productPageLink);
+                    MoveToNextPageOfSearchResults(driver);
+                    numberOfPagesSearched++;
+                }
             }
         }
 
@@ -298,7 +302,7 @@ namespace SeleniumParser
         /// <returns></returns>
         private static bool EnoughPagesHaveBeenSearched(int numberOfPagesSearched)
         {
-            return numberOfPagesSearched < NumberOfPagesToGiveUpAfter;
+            return numberOfPagesSearched > NumberOfPagesToGiveUpAfter;
         }
 
         /// <summary>
@@ -317,11 +321,11 @@ namespace SeleniumParser
         /// <param name="driver"></param>
         /// <param name="productLink"></param>
         /// <returns></returns>
-        private static IEnumerable<BsrRank> FindRankingsForProduct(IWebDriver driver, string productLink)
+        private static IEnumerable<BsrRank> FindRankingsForProduct(IWebDriver driver, string productLink, string searchTerm)
         {
             Driver.GoToLink(driver, productLink);
 
-            return GetRankings(driver);
+            return GetRankings(driver, searchTerm);
         }
 
         /// <summary>
@@ -357,6 +361,9 @@ namespace SeleniumParser
             // Click the search button
             var searchButton = driver.FindElement(By.ClassName("nav-input"));
             searchButton.Click();
+
+            Driver.WaitForPageToLoad();
+
         }
 
         /// <summary>
@@ -394,7 +401,7 @@ namespace SeleniumParser
         /// </summary>
         /// <param name="driver"></param>
         /// <returns></returns>
-        static IEnumerable<BsrRank> GetRankings(IWebDriver driver)
+        static IEnumerable<BsrRank> GetRankings(IWebDriver driver, string searchTerm)
         {
             List<BsrRank> bsrRanks = new List<BsrRank>();
 
@@ -430,6 +437,7 @@ namespace SeleniumParser
                                 , categoryName
                                 , rank
                                 , rankingString
+                                , searchTerm
                             ));
                         }
                     }

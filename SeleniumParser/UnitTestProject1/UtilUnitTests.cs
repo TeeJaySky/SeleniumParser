@@ -11,7 +11,7 @@ namespace UnitTestProject1
         [TestMethod]
         public void MakeCsv_ReturnsExpectedCSVString_WhenGivenListOfInputs()
         {
-            string result = Driver.ToCsv("a", "b", "c");
+            string result = Log.ToCsv("a", "b", "c");
             string expectedResult = "a, b, c";
 
             Assert.AreEqual(result, expectedResult);
@@ -20,7 +20,7 @@ namespace UnitTestProject1
         [TestMethod]
         public void MakeCsv_DoesNotReturnAStringWithATrailingComma_WhenGivenASingleInput()
         {
-            string result = Driver.ToCsv("a");
+            string result = Log.ToCsv("a");
             string expectedResult = "a";
 
             Assert.AreEqual(result, expectedResult);

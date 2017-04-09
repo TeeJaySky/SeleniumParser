@@ -73,8 +73,6 @@ namespace SeleniumParser
                 }
             }
 
-            Console.ReadKey();
-
             // Close the browser
             Driver.Close();
         }
@@ -303,7 +301,7 @@ namespace SeleniumParser
             {
                 // If the product is really crap, it may not rank on anything
                 // Catch exception thrown in this case and just move on...
-                Log.Error("Exception caught trying to consider " + Driver.Url + ". Exception: " + e.Message);
+                //Log.Error("Exception caught trying to consider " + Driver.Url + ". Exception: " + e.Message);
             }
 
             return bsrRanks;

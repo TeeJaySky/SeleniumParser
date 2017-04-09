@@ -123,7 +123,7 @@ namespace SeleniumParser
             Parallel.For(
                 0
                 , SearchTerms.Count
-                //, new ParallelOptions { MaxDegreeOfParallelism = 10 }
+                , new ParallelOptions { MaxDegreeOfParallelism = 30 }
                 , i => {
                 var amazonNavigator = new AmazonNavigator(SearchTerms[i], CategoriesToConsider, SearchCategory);
                 amazonNavigator.PerformSearch();

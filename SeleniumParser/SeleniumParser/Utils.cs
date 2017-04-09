@@ -22,7 +22,8 @@ namespace SeleniumParser
             ChromeOptions options = new ChromeOptions();
             // When launching chrome, configure it not to load images as this will slow down the page load times
             options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
-            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options);
+            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options, TimeSpan.FromMinutes(10));
+            driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(10);
 
             driver.Url = "http://www.amazon.com";
             WaitForPageToLoad();

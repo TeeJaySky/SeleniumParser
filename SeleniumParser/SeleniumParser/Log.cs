@@ -2,6 +2,8 @@
 using System.IO;
 using System.Collections.Generic;
 using System.Threading;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace SeleniumParser
 {
@@ -10,8 +12,79 @@ namespace SeleniumParser
         static string LogFileName = "Log.csv";
         static string ResultsFileName = "Results.csv";
         static string OutputFileDir = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\";
-        static Object logFileLock = new Object();
-        static Object resultFileLock = new Object();
+
+        // Incoming queue for messages to put into the log
+        static ConcurrentQueue<string> logMessageQueue = new ConcurrentQueue<string>();
+
+        // Incoming queue for bsr rankings to put into the results file
+        static ConcurrentQueue<IEnumerable<BsrRank>> bsrRankQueue = new ConcurrentQueue<IEnumerable<BsrRank>>();
+
+        static ManualResetEvent bsrThreadDone = new ManualResetEvent(false);
+        static ManualResetEvent logThreadDone = new ManualResetEvent(false);
+        static ManualResetEvent loggerDone = new ManualResetEvent(false);
+
+        private static void LogThread()
+        {
+            bool logThreadFinished = false;
+            while(!logThreadFinished)
+            {
+                // While there are things in the queue
+                while(!logMessageQueue.IsEmpty)
+                {
+                    // Try to get one from the queue
+                    string logMessage;
+                    if (logMessageQueue.TryDequeue(out logMessage))
+                    {
+                        // If we got it from the queue, log it!
+                        LogMessage(logMessage);
+                    }
+                }
+
+                logThreadFinished = logThreadDone.WaitOne(1000);
+            }
+        }
+
+        private static void BsrThread()
+        {
+            bool bsrThreadFinished = false;
+            while (!bsrThreadFinished)
+            {
+                // While there are things in the queue
+                while(!bsrRankQueue.IsEmpty)
+                {
+                    // Try to get one from the queue
+                    IEnumerable<BsrRank> bsrRankings;
+                    if(bsrRankQueue.TryDequeue(out bsrRankings))
+                    {
+                        // Log the rankings
+                        LogBsrRankings(bsrRankings);
+                    }
+                }
+
+                bsrThreadFinished = bsrThreadDone.WaitOne(1000);
+            }
+        }
+
+        public static void ThreadMain()
+        {
+            var logThread = new Thread(LogThread);
+            logThread.Start();
+
+            var bsrThread = new Thread(BsrThread);
+            bsrThread.Start();
+
+            // Wait for the termination message
+            loggerDone.WaitOne();
+
+            // Signal the other threads to clean up but its probably too late at this point
+            logThreadDone.Set();
+            bsrThreadDone.Set();
+        }
+
+        public static void ShutDown()
+        {
+            loggerDone.Set();
+        }
 
         /// <summary>
         /// Create csv string from inputs
@@ -23,21 +96,33 @@ namespace SeleniumParser
         }
 
         /// <summary>
-        /// Log message to console and log file at information level
+        /// Make a log message
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="logLevel"></param>
+        /// <returns></returns>
+        private static string MakeLogMessage(string message, string logLevel)
+        {
+            string logMessage = ToCsv(Thread.CurrentThread.ManagedThreadId.ToString(), DateTime.Now.ToString(), logLevel, message);
+            return logMessage;
+        }
+
+        /// <summary>
+        /// Queue a log message to be written to a file at information level
         /// </summary>
         /// <param name="message"></param>
         public static void Info(string message)
         {
-            LogMessage(message, "Info");
+            logMessageQueue.Enqueue(MakeLogMessage(message, "Info"));
         }
 
         /// <summary>
-        /// Log message to console and log file at error level
+        /// Queue a log messsage to be written to a file at error level
         /// </summary>
         /// <param name="message"></param>
         public static void Error(string message)
         {
-            LogMessage(message, "Error");
+            logMessageQueue.Enqueue(MakeLogMessage(message, "Error"));
         }
 
         /// <summary>
@@ -46,17 +131,11 @@ namespace SeleniumParser
         /// <param name="fileName"></param>
         /// <param name="message"></param>
         /// <param name="logLevel"></param>
-        private static void LogMessage(string message, string logLevel)
+        private static void LogMessage(string message)
         {
-            lock(logFileLock)
-            {
-                // Create the log file message as csv with date stamp
-                string logMessage = ToCsv(Thread.CurrentThread.ManagedThreadId.ToString(), DateTime.Now.ToString(), logLevel, message);
-
-                // Write to console and file
-                Console.WriteLine(logMessage);
-                WriteToLogFile(logMessage);
-            }
+            // Write to console and file
+            Console.WriteLine(message);
+            WriteToLogFile(message);
         }
 
         /// <summary>
@@ -92,24 +171,26 @@ namespace SeleniumParser
         /// <param name="rankings"></param>
         public static void BsrRankings(IEnumerable<BsrRank> rankings)
         {
-            lock(resultFileLock)
+            bsrRankQueue.Enqueue(rankings);
+        }
+
+        private static void LogBsrRankings(IEnumerable<BsrRank> rankings)
+        {
+            var outputFileName = OutputFileDir + ResultsFileName;
+
+            var fileExists = File.Exists(outputFileName);
+
+            using (var writer = File.AppendText(outputFileName))
             {
-                var outputFileName = OutputFileDir + ResultsFileName;
-
-                var fileExists = File.Exists(outputFileName);
-
-                using (var writer = File.AppendText(outputFileName))
+                // If the file does not exists, write the column headings
+                if (!fileExists)
                 {
-                    // If the file does not exists, write the column headings
-                    if (!fileExists)
-                    {
-                        writer.WriteLine("Search Term, Title, Category, BSR, URL");
-                    }
+                    writer.WriteLine("Search Term, Title, Category, BSR, URL");
+                }
 
-                    foreach (var ranking in rankings)
-                    {
-                        writer.WriteLine(ranking.ToString());
-                    }
+                foreach (var ranking in rankings)
+                {
+                    writer.WriteLine(ranking.ToString());
                 }
             }
         }

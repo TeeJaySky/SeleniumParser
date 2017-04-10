@@ -32,6 +32,13 @@ namespace SeleniumParser
             SearchTerm = searchTerm;
             CategoriesToConsider = categoriesToConsider;
             SearchCategory = searchCategory;
+
+            Log.Info("Starting navigator for " + searchTerm + " on thread " + Thread.CurrentThread.ManagedThreadId.ToString());
+        }
+
+        ~AmazonNavigator()
+        {
+            Log.Info(ToString());
         }
 
         public override string ToString()
@@ -41,9 +48,6 @@ namespace SeleniumParser
 
         public void PerformSearch()
         {
-            // Create our driver when the threadpool is ready to start processing us
-            Driver = DriverUtils.Make();
-
             int attemptsForSearchTerm = 0;
             int maximumAttemptsToSearchForTerm = 3;
 
@@ -51,6 +55,9 @@ namespace SeleniumParser
             {
                 try
                 {
+                    // Create our driver when the threadpool is ready to start processing us
+                    Driver = DriverUtils.Make();
+
                     var recoveryUrl = Driver.Url;
                     FindProductsForSearchTerm();
                 }
@@ -66,15 +73,11 @@ namespace SeleniumParser
                     }
 
                     Log.Error("Attempting to clean up old web driver");
-                    TryToCleanUpFromException();
-
-                    // Now that we have tried to recover by cleaning up, create a new web driver
-                    Driver = DriverUtils.Make();
+                    CleanUpDriver();
                 }
             }
 
-            // Close the browser
-            Driver.Close();
+            CleanUpDriver();
         }
 
         /// <summary>
@@ -90,7 +93,7 @@ namespace SeleniumParser
         /// <summary>
         /// Kill chrome processes started be selenium and try and close the driver
         /// </summary>
-        private void TryToCleanUpFromException()
+        private void CleanUpDriver()
         {
             try
             {
@@ -297,7 +300,7 @@ namespace SeleniumParser
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // If the product is really crap, it may not rank on anything
                 // Catch exception thrown in this case and just move on...

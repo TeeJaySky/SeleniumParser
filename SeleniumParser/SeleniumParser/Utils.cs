@@ -19,14 +19,42 @@ namespace SeleniumParser
         /// <returns></returns>
         public static IWebDriver Make()
         {
+            bool madeDriver = false;
+
             ChromeOptions options = new ChromeOptions();
             // When launching chrome, configure it not to load images as this will slow down the page load times
             options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
-            IWebDriver driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options, TimeSpan.FromMinutes(10));
-            driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(10);
 
-            driver.Url = "http://www.amazon.com";
-            WaitForPageToLoad();
+            IWebDriver driver = null;
+
+            int creationAttempts = 0;
+            const int maxDriverCreationAttempts = 100;
+
+            while(!madeDriver)
+            {
+                try
+                {
+                    driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options, TimeSpan.FromMinutes(10));
+                    driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(10);
+
+                    driver.Url = "http://www.amazon.com";
+                    WaitForPageToLoad();
+
+                    madeDriver = true;
+                }
+                catch
+                {
+                    creationAttempts++;
+
+                    Log.Error("Couldn't make driver. Attempt number " + creationAttempts);
+
+                    if(creationAttempts == maxDriverCreationAttempts)
+                    {
+                        throw new Exception("Couldnt make driver in " + creationAttempts + " attempts");
+                    }
+                    // Don't do anything - just keep trying to make that god damn driver!!
+                }
+            }
 
             return driver;
         }

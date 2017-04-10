@@ -114,27 +114,68 @@ namespace SeleniumParser
 
         static void Main(string[] args)
         {
+            var loggingThread = new Thread(Log.ThreadMain);
+            loggingThread.Start();
+
             Log.Info("Search starting");
 
             // One collection of navigators
             List<AmazonNavigator> navigators = new List<AmazonNavigator>();
 
-            // Parallelise the navigation
-            Parallel.For(
-                0
-                , SearchTerms.Count
-                , new ParallelOptions { MaxDegreeOfParallelism = 30 }
-                , i => {
-                var amazonNavigator = new AmazonNavigator(SearchTerms[i], CategoriesToConsider, SearchCategory);
-                amazonNavigator.PerformSearch();
-            });
+            List<Task> tasks = new List<Task>();
+
+            // Initial group preparation
+            int searchTermIndex;
+            const int maximumNumberOfConcurrentTasks = 15;
+            for(searchTermIndex = 0; searchTermIndex < Math.Min(maximumNumberOfConcurrentTasks, SearchTerms.Count); searchTermIndex ++)
+            {
+                Task task = CreateAmazonNavigator(searchTermIndex);
+
+                tasks.Add(task);
+            }
+
+            bool finishedAddingTasks = false;
+            while (!finishedAddingTasks)
+            {
+                // Wait for any task to finish
+                var completedTaskIndex = Task.WaitAny(tasks.ToArray());
+                tasks.RemoveAt(completedTaskIndex);
+
+                searchTermIndex++;
+
+                // Determine if we still have more search terms to look at
+                if(searchTermIndex < SearchTerms.Count)
+                {
+                    Log.Info("Adding new task to maintain 10 active searches");
+
+                    // Add the next term to the list
+                    tasks.Add(CreateAmazonNavigator(searchTermIndex));
+                }
+                else
+                {
+                    finishedAddingTasks = true;
+                }
+            }
+
+            Log.Info("Finished adding tasks. Waiting for remaining tasks to complete");
+
+            // We have no more tasks to add, so just wait for the rest to finish
+            Task.WaitAll(tasks.ToArray());
+
+            Log.ShutDown();
 
             Log.Info("Search complete!");
+        }
 
-            for(int i = 0; i < SearchTerms.Count; i ++)
+        private static Task CreateAmazonNavigator(int searchTermIndex)
+        {
+            // Create the amazon navigator as an asynchronous task
+            Task task = Task.Run(() =>
             {
-                Log.Info(navigators[i].ToString());
-            }
+                var amazonNavigator = new AmazonNavigator(SearchTerms[searchTermIndex], CategoriesToConsider, SearchCategory);
+                amazonNavigator.PerformSearch();
+            });
+            return task;
         }
     }
 }

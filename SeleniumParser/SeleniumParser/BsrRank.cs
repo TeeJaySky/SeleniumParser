@@ -24,7 +24,7 @@ namespace SeleniumParser
 
             ProductCategory = RemoveCommas(GetDescriptionOfBsrCategory(rankElement, productCategory));
 
-            Log.Info(title + " considered with ranking " + rank + " for category " + productCategory);
+            //Log.Info(title + " considered with ranking " + rank + " for category " + productCategory);
         }
 
         /// <summary>

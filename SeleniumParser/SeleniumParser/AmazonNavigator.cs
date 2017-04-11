@@ -16,8 +16,8 @@ namespace SeleniumParser
         // 100,000 selling one design a day
         // 2,000 25-50 a day
         int MaximumBSR = 100000;
-        int NumberOfProductsToFind = 100;
-        int NumberOfPagesToGiveUpAfter = 100;
+        int NumberOfProductsToFind = 50;
+        int NumberOfPagesToGiveUpAfter = 20;
 
         int numberOfPagesSearched = 0;
         int numberOfProductsFound = 0;
@@ -33,12 +33,12 @@ namespace SeleniumParser
             CategoriesToConsider = categoriesToConsider;
             SearchCategory = searchCategory;
 
-            Log.Info("Starting navigator for " + searchTerm + " on thread " + Thread.CurrentThread.ManagedThreadId.ToString());
+            NavLog("Info", "Starting navigator on thread " + Thread.CurrentThread.ManagedThreadId.ToString());
         }
 
         ~AmazonNavigator()
         {
-            Log.Info(ToString());
+            NavLog("Info", ToString());
         }
 
         public override string ToString()
@@ -56,10 +56,12 @@ namespace SeleniumParser
                 try
                 {
                     // Create our driver when the threadpool is ready to start processing us
-                    Driver = DriverUtils.Make();
+                    Driver = DriverUtils.Make(SearchTerm);
 
                     var recoveryUrl = Driver.Url;
                     FindProductsForSearchTerm();
+
+                    break;
                 }
                 catch // Catch anything and keep trying
                 {
@@ -67,12 +69,12 @@ namespace SeleniumParser
                     if (++attemptsForSearchTerm == maximumAttemptsToSearchForTerm)
                     {
                         // We have failed to search for this term 3 times, move to the next term
-                        Log.Error("Giving up on search term " + SearchTerm + " as maximum retries exceeded");
+                        NavLog("Error", "Giving up on search term " + SearchTerm + " as maximum retries exceeded");
 
                         attemptsForSearchTerm = 0;
                     }
 
-                    Log.Error("Attempting to clean up old web driver");
+                    NavLog("Error", "Attempting to clean up old web driver");
                     CleanUpDriver();
                 }
             }
@@ -103,6 +105,33 @@ namespace SeleniumParser
             catch { } // Ignore failures during cleanup - try and move on from this disaster!
         }
 
+        public bool NextPageButtonExists()
+        {
+            try
+            {
+                Driver.FindElement(By.Id("pagnNextString"));
+                return true;
+            }
+            catch
+            {
+                NavLog("Info", "No more pages ");
+                return false;
+            }
+        }
+
+        private void NavLog(string level, string message)
+        {
+            string termMessage = SearchTerm + " " + message;
+            if(level == "Info")
+            {
+                Log.Info(termMessage);
+            }
+            else if (level == "Error")
+            {
+                Log.Error(termMessage);
+            }
+        }
+
         /// <summary>
         /// Iterates through search results until:
         /// 1. The configured number of products has been found
@@ -113,26 +142,33 @@ namespace SeleniumParser
             // Look up the term using the search bar
             SearchUsingAmazonSearchBar();
 
+            if(!NextPageButtonExists())
+            {
+                return;
+            }
+
             // Keep looking until we have found the requested number of products OR we have searched too many pages
             while (!StopSearchingProduct(numberOfPagesSearched, numberOfProductsFound))
             {
                 var productPageLink = Driver.Url;
                 var productLinks = GetProductLinksOnPage();
 
-                if (productLinks.Count == 0)
-                {
-                    throw new Exception("No product links found. Move onto next product");
-                }
-
                 foreach (var product in productLinks)
                 {
                     var rankings = FindRankingsForProduct(product);
-                    Log.BsrRankings(rankings);
-
-                    if (EnoughProductsHaveBeenFound(++numberOfProductsFound))
+                    if(rankings.ToList().Count > 0)
                     {
-                        // Don't continue processing products on this page if we have found enough
-                        break;
+                        numberOfProductsFound++;
+
+                        NavLog("Info", numberOfProductsFound + " products so far over " + (numberOfPagesSearched+1) + " pages");
+
+                        Log.BsrRankings(rankings);
+
+                        if (EnoughProductsHaveBeenFound(numberOfProductsFound))
+                        {
+                            // Don't continue processing products on this page if we have found enough
+                            break;
+                        }
                     }
                 }
 
@@ -148,14 +184,18 @@ namespace SeleniumParser
         }
 
         /// <summary>
-        /// Determines whether or not we have exceeded the thresholds for number of products found or number of pages searched
+        /// Stop searching when:
+        /// The next page button doesn't exist (don't bother searching last page results as they will likely be crap)
+        /// OR we have exceeded the threshold for number of products found 
+        /// OR we have exceeded the threshold for number of pages searched
         /// </summary>
         /// <param name="numberOfPagesSearched"></param>
         /// <param name="numberOfProductsFound"></param>
         /// <returns></returns>
         private  bool StopSearchingProduct(int numberOfPagesSearched, int numberOfProductsFound)
         {
-            return EnoughProductsHaveBeenFound(numberOfProductsFound) ||
+            return  !NextPageButtonExists() ||
+                    EnoughProductsHaveBeenFound(numberOfProductsFound) ||
                     EnoughPagesHaveBeenSearched(numberOfPagesSearched);
         }
 
@@ -166,7 +206,7 @@ namespace SeleniumParser
         /// <returns></returns>
         private  bool EnoughPagesHaveBeenSearched(int numberOfPagesSearched)
         {
-            return numberOfPagesSearched > NumberOfPagesToGiveUpAfter;
+            return numberOfPagesSearched >= NumberOfPagesToGiveUpAfter;
         }
 
         /// <summary>
@@ -176,7 +216,7 @@ namespace SeleniumParser
         /// <returns></returns>
         private bool EnoughProductsHaveBeenFound(int numberFound)
         {
-            return numberFound > NumberOfProductsToFind;
+            return numberFound >= NumberOfProductsToFind;
         }
 
         /// <summary>
@@ -232,7 +272,7 @@ namespace SeleniumParser
         /// <returns></returns>
         public List<string> GetProductLinksOnPage()
         {
-            Log.Info("Getting product links");
+            NavLog("Info", "Getting product links");
 
             // Get the results container
             var resultsContainer = Driver.FindElement(By.Id("atfResults"));
@@ -249,7 +289,7 @@ namespace SeleniumParser
                 strings.Add(productLink);
             }
 
-            Log.Info("Found " + strings.Count + " links");
+            NavLog("Info", "Found " + strings.Count + " links");
 
             return strings;
         }
@@ -304,7 +344,7 @@ namespace SeleniumParser
             {
                 // If the product is really crap, it may not rank on anything
                 // Catch exception thrown in this case and just move on...
-                //Log.Error("Exception caught trying to consider " + Driver.Url + ". Exception: " + e.Message);
+                //NavLog("Error", ("Exception caught trying to consider " + Driver.Url + ". Exception: " + e.Message);
             }
 
             return bsrRanks;

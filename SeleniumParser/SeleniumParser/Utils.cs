@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using System.Drawing;
 
 namespace SeleniumParser
 {
@@ -17,13 +18,15 @@ namespace SeleniumParser
         /// Create the driver and navigate to amazon home
         /// </summary>
         /// <returns></returns>
-        public static IWebDriver Make()
+        public static IWebDriver Make(string searchTerm)
         {
             bool madeDriver = false;
 
             ChromeOptions options = new ChromeOptions();
             // When launching chrome, configure it not to load images as this will slow down the page load times
             options.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
+            options.AddArgument("--ignore-certificate-errors");
+            options.AddArgument("--ignore-ssl-errors");
 
             IWebDriver driver = null;
 
@@ -34,8 +37,12 @@ namespace SeleniumParser
             {
                 try
                 {
+                    Log.Info(searchTerm + " attempting to create driver");
+
                     driver = new ChromeDriver(@"C:\Users\Trent\Desktop\Projects\SeleniumParser\SeleniumParser", options, TimeSpan.FromMinutes(10));
                     driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(10);
+
+                    Log.Info(searchTerm + " Navigating to amazon");
 
                     driver.Url = "http://www.amazon.com";
                     WaitForPageToLoad();
@@ -46,19 +53,21 @@ namespace SeleniumParser
                 {
                     creationAttempts++;
 
-                    Log.Error("Couldn't make driver. Attempt number " + creationAttempts);
+                    Log.Error(searchTerm + " Couldn't make driver. Attempt number " + creationAttempts);
 
                     if(creationAttempts == maxDriverCreationAttempts)
                     {
-                        throw new Exception("Couldnt make driver in " + creationAttempts + " attempts");
+                        throw new Exception(searchTerm + " Couldnt make driver in " + creationAttempts + " attempts");
                     }
                     // Don't do anything - just keep trying to make that god damn driver!!
                 }
             }
 
+            Log.Info(searchTerm + " Created driver");
+
             return driver;
         }
-
+        
         /// <summary>
         /// Navigate to the specified link
         /// </summary>
@@ -77,7 +86,7 @@ namespace SeleniumParser
         public static void WaitForPageToLoad()
         {
             // Wait for page to load
-            Thread.Sleep(PageLoadDuration);
+            //Thread.Sleep(PageLoadDuration);
         }
     }
 }

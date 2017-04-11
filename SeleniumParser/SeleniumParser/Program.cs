@@ -29,7 +29,6 @@ namespace SeleniumParser
             , "tea t shirt"
             , "doughnut t shirt"
             , "salty t shirt"
-            , "salty saying t shirt"
             , "snatched t shirt"
             , "werq t shirt"
             , "slay t shirt"
@@ -101,6 +100,7 @@ namespace SeleniumParser
             , "savage t shirt"
             , "thirsty t shirt"
             , "Hillary t shirt"
+            , "blow cup t shirt"
         };
 
         static List<string> CategoriesToConsider = new List<string> { 
@@ -111,6 +111,11 @@ namespace SeleniumParser
         };
 
         static string SearchCategory = "Clothing, Shoes & Jewelry";
+
+        private static bool FindCompleteTasks(Task task)
+        {
+            return task.Status == TaskStatus.RanToCompletion;
+        }
 
         static void Main(string[] args)
         {
@@ -124,57 +129,55 @@ namespace SeleniumParser
 
             List<Task> tasks = new List<Task>();
 
-            // Initial group preparation
-            int searchTermIndex;
+            int searchTermIndex = 0;
             const int maximumNumberOfConcurrentTasks = 15;
-            for(searchTermIndex = 0; searchTermIndex < Math.Min(maximumNumberOfConcurrentTasks, SearchTerms.Count); searchTermIndex ++)
+            while (true)
             {
-                Task task = CreateAmazonNavigator(searchTermIndex);
-
-                tasks.Add(task);
-            }
-
-            bool finishedAddingTasks = false;
-            while (!finishedAddingTasks)
-            {
-                // Wait for any task to finish
-                var completedTaskIndex = Task.WaitAny(tasks.ToArray());
-                tasks.RemoveAt(completedTaskIndex);
-
-                searchTermIndex++;
-
                 // Determine if we still have more search terms to look at
-                if(searchTermIndex < SearchTerms.Count)
+                if (searchTermIndex < SearchTerms.Count && tasks.Count < maximumNumberOfConcurrentTasks)
                 {
-                    Log.Info("Adding new task to maintain 10 active searches");
-
                     // Add the next term to the list
                     tasks.Add(CreateAmazonNavigator(searchTermIndex));
+                    searchTermIndex++;
+                    
+                    Log.Info("Added task. " + tasks.Count + " out of " + maximumNumberOfConcurrentTasks + " active searches. Current search index: " + searchTermIndex);
                 }
-                else
+
+                // After 30 seconds, see what tasks finished
+                Task.WaitAny(tasks.ToArray(), 2000);
+
+                var results = tasks.FindAll(FindCompleteTasks);
+                var finishedTasks = results.Count;
+
+                foreach (var result in results)
                 {
-                    finishedAddingTasks = true;
+                    tasks.Remove(result);
+                }
+
+                if (tasks.Count == 0)
+                {
+                    break;
                 }
             }
 
-            Log.Info("Finished adding tasks. Waiting for remaining tasks to complete");
-
-            // We have no more tasks to add, so just wait for the rest to finish
-            Task.WaitAll(tasks.ToArray());
+            Log.Info("Search complete!");
 
             Log.ShutDown();
-
-            Log.Info("Search complete!");
         }
 
         private static Task CreateAmazonNavigator(int searchTermIndex)
         {
             // Create the amazon navigator as an asynchronous task
-            Task task = Task.Run(() =>
-            {
-                var amazonNavigator = new AmazonNavigator(SearchTerms[searchTermIndex], CategoriesToConsider, SearchCategory);
-                amazonNavigator.PerformSearch();
-            });
+            Task task = Task.Factory.StartNew(
+                () =>
+                {
+                    var amazonNavigator = new AmazonNavigator(SearchTerms[searchTermIndex], CategoriesToConsider, SearchCategory);
+                    amazonNavigator.PerformSearch();
+                }
+            , CancellationToken.None
+            , TaskCreationOptions.LongRunning
+            , TaskScheduler.Default);
+
             return task;
         }
     }

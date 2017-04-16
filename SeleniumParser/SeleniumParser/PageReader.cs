@@ -43,7 +43,7 @@ namespace SeleniumParser
                             var productTitle = driver.FindElement(By.Id("title")).Text;
 
                             var outputPath = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\Images";
-                            var fileName = "bsr" + rankingString + "time" + DateTime.Now.ToString("yyyyMMddhhmmsstt") + searchTerm + ".png";
+                            var fileName = rankingString + "-" + searchTerm + "-" + DateTime.Now.ToString("yyyyMMddhhmmsstt") + ".png";
                             var outputFileName = Path.Combine(outputPath, fileName);
 
                             if (!imageAlreadySaved)

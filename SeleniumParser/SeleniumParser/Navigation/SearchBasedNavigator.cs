@@ -14,6 +14,7 @@ namespace SeleniumParser
 {
     public class SearchBasedNavigator : Navigator
     {
+        #region Old Search Terms
         static List<string> SearchTerms = new List<string> { 
             "Funny"
            , "Humor"
@@ -27,107 +28,65 @@ namespace SeleniumParser
            , "motivation"
            , "beer"
            , "football"
-#region old stuff
-            //"cat t shirt"
-            //, "motivational t shirt"
-            //, "motivational exercise t shirt"
-            //, "saying t shirt"
-            //, "donald trump t shirt"
-            //, "anti donald trump t shirt"
-            //, "political t shirt"
-            //, "cat saying t shirt"
-            //, "dog saying t shirt"
-            //, "funny saying t shirt"
-            //, "french bulldog t shirt"
-            //, "pug t shirt"
-            //, "funny saying t shirt"
-            //, "coffee t shirt"
-            //, "tea t shirt"
-            //, "doughnut t shirt"
-            //, "salty t shirt"
-            //, "snatched t shirt"
-            //, "werq t shirt"
-            //, "slay t shirt"
-            //, "yolo t shirt"
-            //, "a crapella t shirt"
-            //, "amazeballs t shirt"
-            //, "askhole t shirt"
-            //, "awesome sauce t shirt"
-            //, "baby bump t shirt"
-            //, "badassery t shirt"
-            //, "beer me t shirt"
-            //, "blamestorming t shirt"
-            //, "bootylicious t shirt"
-            //, "bromance t shirt"
-            //, "bye felicia t shirt"
-            //, "cougar t shirt"
-            //, "designated drunk t shirt"
-            //, "duck face t shirt"
-            //, "fanboi t shirt"
-            //, "fan girl t shirt"
-            //, "fauxpology t shirt"
-            //, "foodie t shirt"
-            //, "frak t shirt"
-            //, "friend zone t shirt"
-            //, "fro yo t shirt"
-            //, "fro-yo t shirt"
-            //, "gaydar t shirt"
-            //, "girl crush t shirt"
-            //, "grrrl t shirt"
-            //, "hangry t shirt"
-            //, "hipster t shirt"
-            //, "hot mess t shirt"
-            //, "humblebrag t shirt"
-            //, "jailbait t shirt"
-            //, "knosh t shirt"
-            //, "lol t shirt"
-            //, "make it rain t shirt"
-            //, "man boobs t shirt"
-            //, "man cave t shirt"
-            //, "man sweats t shirt"
-            //, "milf t shirt"
-            //, "netflix and chill t shirt"
-            //, "ninja sex t shirt"
-            //, "nom t shirt"
-            //, "nontroversy t shirt"
-            //, "nsfw t shirt"
-            //, "party foul t shirt"
-            //, "phat t shirt"
-            //, "pregret t shirt"
-            //, "pwned t shirt"
-            //, "quantum physics t shirt"
-            //, "ratchet t shirt"
-            //, "rendezbooz t shirt"
-            //, "rickroll t shirt"
-            //, "said no one ever t shirt"
-            //, "selfie t shirt"
-            //, "sext t shirt"
-            //, "side boob t shirt"
-            //, "that's what she said t shirt"
-            //, "trout t shirt"
-            //, "twerk t shirt"
-            //, "typeractive t shirt"
-            //, "wtf t shirt"
-            //, "yolo t shirt"
-            //, "zombie t shirt"
-            //, "sus t shirt"
-            //, "boots t shirt"
-            //, "hunty t shirt"
-            //, "savage t shirt"
-            //, "thirsty t shirt"
-            //, "Hillary t shirt"
-            //, "blow cup t shirt"
-#endregion
+           , "gin"
+           , "wine"
+           , "drinking"
+           , "fishing"
+           , "golf"
+           , "wrestling"
+           , "football"
+           , "soccer"
         };
+        #endregion
 
+        #region Old Novelty Womens Tees Search
+        //static List<string> SearchTerms = new List<string> { 
+        //    "Cat"
+        //    , "funny"
+        //    , "sarcastic"
+        //    , "dog"
+        //    , "Coffee"
+        //    , "Exercise"
+        //    , "Gym"
+        //    , "doughnut"
+        //    , "wine"
+        //    , "gin"
+        //    , "vodka"
+        //    , "drinking"
+        //    , "bride"
+        //    , "bridesmaid"
+        //    , "sister"
+        //    , "salty"
+        //    , "Motivation"
+        //    , "yolo"
+        //    , "lazy"
+        //    , "fangirl"
+        //    , "cougar"
+        //    , "hot mess"
+        //    , "wife"
+        //    , "mother"
+        //    , "daughter"
+        //    , "cooking"
+        //    , "baking"
+        //    , "tea"
+        //    , "pink"
+        //    , "girl"
+        //    , "woman"
+        //};
+        #endregion
+
+        int MaximumNumberOfConcurrentTasks;
+        int NumberOfPagesToSearchWithoutProducts;
         SearcherFactory.SearcherType ProductSearcher;
 
         public SearchBasedNavigator(
             SearcherFactory.SearcherType searcher
             , List<string> categoriesToConsider
             , int maxBsr = 100000
-            , int numberOfProductsToFind = 5
-            , int numberOfPagesToSearch = 20
+            , int numberOfProductsToFind = 50
+            , int numberOfPagesToSearch = 30
+            , int numberOfPagesToSearchWithoutProducts = 3
+            , int maximumNumberOfConcurrentTasks = 10
             )
             : base(
             categoriesToConsider
@@ -137,6 +96,9 @@ namespace SeleniumParser
             )
         {
             ProductSearcher = searcher;
+            MaximumNumberOfConcurrentTasks = maximumNumberOfConcurrentTasks;
+            NumberOfPagesToSearchWithoutProducts = numberOfPagesToSearchWithoutProducts;
+
             Log.Info("Starting navigator on thread " + Thread.CurrentThread.ManagedThreadId.ToString());
         }
 
@@ -146,17 +108,16 @@ namespace SeleniumParser
 
             // Create a new task for each search term, up to a maximum number of concurrent tasks
             int searchTermIndex = 0;
-            const int maximumNumberOfConcurrentTasks = 2;
             while (true)
             {
                 // Determine if we still have more search terms to look at
-                if (searchTermIndex < SearchTerms.Count && tasks.Count < maximumNumberOfConcurrentTasks)
+                if (searchTermIndex < SearchTerms.Count && tasks.Count < MaximumNumberOfConcurrentTasks)
                 {
                     // Add the next term to the list
                     tasks.Add(CreateAmazonNavigator(SearchTerms[searchTermIndex]));
                     searchTermIndex++;
 
-                    Log.Info("Added task. " + tasks.Count + " out of " + maximumNumberOfConcurrentTasks + " active searches. Current search index: " + searchTermIndex);
+                    Log.Info("Added task. " + tasks.Count + " out of " + MaximumNumberOfConcurrentTasks + " active searches. Current search index: " + searchTermIndex);
                 }
 
                 // After 30 seconds, see what tasks finished
@@ -248,6 +209,8 @@ namespace SeleniumParser
 
             int numberOfPagesSearched = 1;
             int numberOfProductsFound = 0;
+            int numberOfProductsFoundOnPage = 0;
+            int numberOfPagesSearchedWithoutProduct = 0;
 
             // Keep looking until we have found the requested number of products OR we have searched too many pages
             while (!StopSearchingProduct(driver, numberOfProductsFound, numberOfPagesSearched))
@@ -263,6 +226,8 @@ namespace SeleniumParser
 
                     if(rankings.ToList().Count > 0)
                     {
+                        numberOfPagesSearchedWithoutProduct = 0;
+                        numberOfProductsFoundOnPage++;
                         numberOfProductsFound++;
 
                         Log.Info(searchTerm + ": " + numberOfProductsFound + " products so far over " + (numberOfPagesSearched) + " pages");
@@ -276,6 +241,20 @@ namespace SeleniumParser
                         }
                     }
                 }
+
+                if (numberOfProductsFoundOnPage == 0)
+                {
+                    Log.Info(searchTerm + ": found zero products on page " + numberOfPagesSearched);
+                    numberOfPagesSearchedWithoutProduct++;
+
+                    if (numberOfPagesSearchedWithoutProduct == NumberOfPagesToSearchWithoutProducts)
+                    {
+                        Log.Info(searchTerm + ": maximum number of pages searched without finding product. Giving up");
+                        break;
+                    }
+                }
+
+                numberOfProductsFoundOnPage = 0;
 
                 // Move to the next page if we have not yet found enough products
                 if (!EnoughProductsHaveBeenFound(numberOfProductsFound))

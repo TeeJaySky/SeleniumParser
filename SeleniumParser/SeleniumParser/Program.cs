@@ -28,7 +28,7 @@ namespace SeleniumParser
 
             Log.Info("Search starting");
 
-            var navigator = NavigationFactory.Make(NavigationFactory.NavigatorType.TopXNavigator, SearcherFactory.SearcherType.MensTeesAndTanks, CategoriesToConsider);
+            var navigator = NavigationFactory.Make(NavigationFactory.NavigatorType.SearchTermBased, SearcherFactory.SearcherType.NoveltyWomensTopAndTees, CategoriesToConsider);
             navigator.PerformSearch();
 
             Log.Info("Search complete!");

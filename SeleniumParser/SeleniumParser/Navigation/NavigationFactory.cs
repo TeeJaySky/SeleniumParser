@@ -27,7 +27,7 @@ namespace SeleniumParser
                     returnNavigator = new TopXNavigator(SearcherFactory.Make(searcher), categoriesToConsider);
                     break;
                 default:
-                    returnNavigator = new SearchBasedNavigator(searcher, categoriesToConsider);
+                    throw new InvalidOperationException("Navigator type does not exist: " + type.ToString());
                     break;
             }
 

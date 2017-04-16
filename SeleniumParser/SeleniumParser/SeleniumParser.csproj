@@ -55,6 +55,8 @@
     <Compile Include="Log.cs" />
     <Compile Include="Navigation\Navigator.cs" />
     <Compile Include="Searcher\MensTeesAndTanksSearcher.cs" />
+    <Compile Include="Searcher\NoveltyMensShirtsSearcher.cs" />
+    <Compile Include="Searcher\NoveltyWomensTopsAndTeesSearcher.cs" />
     <Compile Include="Searcher\Searcher.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

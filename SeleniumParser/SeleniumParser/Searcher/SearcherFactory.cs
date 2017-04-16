@@ -11,6 +11,8 @@ namespace SeleniumParser
         public enum SearcherType
         {
             MensTeesAndTanks
+            , NoveltyMensShirts
+            , NoveltyWomensTopAndTees
         }
 
         public static Searcher Make(SearcherType type)
@@ -23,8 +25,16 @@ namespace SeleniumParser
                     returnSearcher = new MensTeesAndTanksSearcher();
                     break;
 
+                case SearcherType.NoveltyMensShirts:
+                    returnSearcher = new NoveltyMensShirtsSearcher();
+                    break;
+
+                case SearcherType.NoveltyWomensTopAndTees:
+                    returnSearcher = new NoveltyWomensTopsAndTeesSearcher();
+                    break;
+
                 default:
-                    returnSearcher = new MensTeesAndTanksSearcher();
+                    throw new InvalidOperationException("Searcher type does not exist: " + type.ToString());
                     break;
             }
 

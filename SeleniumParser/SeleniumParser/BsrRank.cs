@@ -61,27 +61,43 @@ namespace SeleniumParser
         /// <returns></returns>
         private static string GetDescriptionOfBsrCategory(IWebElement rank, string categoryName)
         {
-            if (categoryName == "T-Shirts")
-            {
-                // Determine whether or not it is for men or women
-                var ladder = rank.FindElement(By.ClassName("zg_hrsr_ladder"));
-                var ladderCategories = ladder.FindElements(By.CssSelector("a"));
+            string categoryLadder = string.Empty;
 
-                foreach (var ladderValue in ladderCategories)
+            // Determine whether or not it is for men or women
+            var ladder = rank.FindElement(By.ClassName("zg_hrsr_ladder"));
+            var ladderCategories = ladder.FindElements(By.CssSelector("a"));
+
+            foreach (var ladderValue in ladderCategories)
+            {
+                if (categoryLadder.Length != 0)
                 {
-                    if (ladderValue.Text == "Women")
-                    {
-                        categoryName = "Women's " + categoryName;
-                        break;
-                    }
-                    else if (ladderValue.Text == "Men")
-                    {
-                        categoryName = "Men's " + categoryName;
-                        break;
-                    }
+                    categoryLadder += "-";
                 }
+                categoryLadder += ladderValue.Text;
             }
-            return categoryName;
+
+            return categoryLadder;
+
+            //if (categoryName == "T-Shirts")
+            //{
+            //    // Determine whether or not it is for men or women
+            //    var ladder = rank.FindElement(By.ClassName("zg_hrsr_ladder"));
+            //    var ladderCategories = ladder.FindElements(By.CssSelector("a"));
+
+            //    foreach (var ladderValue in ladderCategories)
+            //    {
+            //        if (ladderValue.Text == "Women")
+            //        {
+            //            categoryName = "Women's " + categoryName;
+            //            break;
+            //        }
+            //        else if (ladderValue.Text == "Men")
+            //        {
+            //            categoryName = "Men's " + categoryName;
+            //            break;
+            //        }
+            //    }
+            //}
         }
 
         /// <summary>

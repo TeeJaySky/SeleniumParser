@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace SeleniumParser
 {
@@ -180,18 +181,46 @@ namespace SeleniumParser
 
             var fileExists = File.Exists(outputFileName);
 
-            using (var writer = File.AppendText(outputFileName))
+            if (!ProductExistsInResults(rankings.First(), outputFileName))
             {
-                // If the file does not exists, write the column headings
-                if (!fileExists)
+                using (var writer = File.AppendText(outputFileName))
                 {
-                    writer.WriteLine("Search Term, Title, Category, BSR, URL, Image Location");
+                    // If the file does not exists, write the column headings
+                    if (!fileExists)
+                    {
+                        writer.WriteLine("Search Term, Title, Category, BSR, URL, Image Location");
+                    }
+
+                    foreach (var ranking in rankings)
+                    {
+                        writer.WriteLine(ranking.ToString());
+                    }
+                }
+            }
+        }
+
+        private static bool ProductExistsInResults(BsrRank rank, string outputFileName)
+        {
+            if(!File.Exists(outputFileName))
+            {
+                return false;
+            }
+
+            using(var reader = new System.IO.StreamReader(outputFileName))
+            {
+                string line;
+                while((line = reader.ReadLine()) != null)
+                {
+                    BsrRank currentRank = new BsrRank(line);
+                    if(currentRank.Title == rank.Title || currentRank.Url == rank.Url)
+                    {
+                        Log.Info("Skipping product that already exists: " + rank.Title + ", " + rank.Url);
+
+                        return true;
+                    }
                 }
 
-                foreach (var ranking in rankings)
-                {
-                    writer.WriteLine(ranking.ToString());
-                }
+                return false;
             }
         }
     }

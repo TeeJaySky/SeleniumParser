@@ -29,6 +29,19 @@ namespace SeleniumParser
             //Log.Info(title + " considered with ranking " + rank + " for category " + productCategory);
         }
 
+        public BsrRank(string csv)
+        {
+            var results = csv.Split(new string[] { ", " }, StringSplitOptions.None).ToList();
+
+            SearchTerm = results[0];
+            Title = results[1];
+            ProductCategory = results[2];
+            Rank = results[3];
+            Url = results[4];
+            ImageLocation = results[5];
+        }
+         
+
         /// <summary>
         /// Remove unwanted commas from the input string
         /// </summary>

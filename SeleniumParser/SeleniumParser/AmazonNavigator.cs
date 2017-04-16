@@ -3,7 +3,9 @@ using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,13 +27,11 @@ namespace SeleniumParser
         string SearchTerm;
         IWebDriver Driver;
         List<string> CategoriesToConsider;
-        string SearchCategory;
 
-        public AmazonNavigator(string searchTerm ,List<string> categoriesToConsider, string searchCategory)
+        public AmazonNavigator(string searchTerm ,List<string> categoriesToConsider)
         {
             SearchTerm = searchTerm;
             CategoriesToConsider = categoriesToConsider;
-            SearchCategory = searchCategory;
 
             NavLog("Info", "Starting navigator on thread " + Thread.CurrentThread.ManagedThreadId.ToString());
         }
@@ -43,7 +43,7 @@ namespace SeleniumParser
 
         public override string ToString()
         {
-            return SearchTerm + ": " + numberOfProductsFound + " products found over " + numberOfPagesSearched + " pages";
+            return numberOfProductsFound + " products found over " + numberOfPagesSearched + " pages";
         }
 
         public void PerformSearch()
@@ -139,8 +139,9 @@ namespace SeleniumParser
         /// </summary>
         private void FindProductsForSearchTerm()
         {
-            // Look up the term using the search bar
-            SearchUsingAmazonSearchBar();
+            // Todo: create factory to instantiate the required searcher
+            var searcher = new MensTeesAndTanksSearcher(Driver);
+            searcher.SearchForProduct(SearchTerm);
 
             if(!NextPageButtonExists())
             {
@@ -231,41 +232,6 @@ namespace SeleniumParser
         }
 
         /// <summary>
-        /// Selects the configured category from the dropdown list next to the search bar
-        /// </summary>
-        private void SelectProductCategoryForSearchBar()
-        {
-            // Ensure that we are searching with the right category. Each category apparently has different page formatting
-            var categoryDropdown = Driver.FindElement(By.ClassName("nav-search-dropdown"));
-            var selectElementDropdown = new SelectElement(categoryDropdown);
-
-            // Select the required category
-            selectElementDropdown.SelectByText(SearchCategory);
-        }
-
-        /// <summary>
-        /// Chooses product category, and then searches for the specified term by typing into search box and clicking the search button
-        /// </summary>
-        public void SearchUsingAmazonSearchBar()
-        {
-            SelectProductCategoryForSearchBar();
-
-            // Get the search box
-            IWebElement searchBox = Driver.FindElement(By.Id("twotabsearchtextbox"));
-
-            searchBox.Clear();
-
-            // Search for the term
-            searchBox.SendKeys(SearchTerm);
-
-            // Click the search button
-            var searchButton = Driver.FindElement(By.ClassName("nav-input"));
-            searchButton.Click();
-
-            DriverUtils.WaitForPageToLoad();
-        }
-
-        /// <summary>
         /// Get products on the search results page
         /// </summary>
         /// <param name="driver"></param>
@@ -310,6 +276,8 @@ namespace SeleniumParser
                 // Find the list of items in this container
                 var ranks = salesRank.FindElements(By.CssSelector("li"));
 
+                bool imageAlreadySaved = false;
+
                 foreach (var rank in ranks)
                 {
                     // The text is in a b tag
@@ -327,6 +295,25 @@ namespace SeleniumParser
                             // Store the title for this product now that we want to consider it (delayed DOM query to increase efficiency)
                             var productTitle = Driver.FindElement(By.Id("title")).Text;
 
+                            var outputPath = @"C:\Users\Trent\Desktop\TEmp\Outspoken Panda\Images";
+                            var fileName = "bsr" + rankingString + "time" + DateTime.Now.ToString("yyyyMMddhhmmsstt") + SearchTerm + ".png";
+                            var outputFileName = Path.Combine(outputPath, fileName);
+
+                            if (!imageAlreadySaved)
+                            {
+                                // Download the image using webclient
+                                using (var client = new WebClient())
+                                {
+                                    var imageWrapper = Driver.FindElement(By.Id("imgTagWrapperId"));
+                                    var image = imageWrapper.FindElement(By.CssSelector("img"));
+                                    var imageSrc = image.GetAttribute("src");
+
+                                    client.DownloadFile(imageSrc, outputFileName);
+
+                                    imageAlreadySaved = true;
+                                }
+                            }
+
                             // Add the ranking to the collection that we want to look at
                             bsrRanks.Add(new BsrRank(
                                 Driver.Url
@@ -335,7 +322,9 @@ namespace SeleniumParser
                                 , rank
                                 , rankingString
                                 , SearchTerm
+                                , outputFileName
                             ));
+
                         }
                     }
                 }

@@ -185,7 +185,7 @@ namespace SeleniumParser
                 // If the file does not exists, write the column headings
                 if (!fileExists)
                 {
-                    writer.WriteLine("Search Term, Title, Category, BSR, URL");
+                    writer.WriteLine("Search Term, Title, Category, BSR, URL, Image Location");
                 }
 
                 foreach (var ranking in rankings)

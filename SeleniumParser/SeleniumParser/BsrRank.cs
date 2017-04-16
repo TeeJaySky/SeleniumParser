@@ -14,13 +14,15 @@ namespace SeleniumParser
         public string ProductCategory;
         public string Rank;
         public string SearchTerm;
+        public string ImageLocation;
 
-        public BsrRank(string url, string title, string productCategory, IWebElement rankElement, string rank, string searchTerm)
+        public BsrRank(string url, string title, string productCategory, IWebElement rankElement, string rank, string searchTerm, string imageLocation)
         {
             Url = RemoveCommas(url);
             Title = RemoveCommas(title);
             Rank = RemoveCommas(rank);
             SearchTerm = RemoveCommas(searchTerm);
+            ImageLocation = imageLocation;
 
             ProductCategory = RemoveCommas(GetDescriptionOfBsrCategory(rankElement, productCategory));
 
@@ -74,7 +76,7 @@ namespace SeleniumParser
         /// </summary>
         /// <returns></returns>
         public override string ToString() {
-            return Log.ToCsv(SearchTerm, Title, ProductCategory, Rank, Url);
+            return Log.ToCsv(SearchTerm, Title, ProductCategory, Rank, Url, ImageLocation);
         }  
     }
 }
